@@ -76,7 +76,12 @@ ext.deployJarFiles = { File jarFile ->
         into parentBuildsDir
     }
 
-    // Feste Kopie 'browars-latest.jar' für Symlinks bereitstellen
+    // Feste Kopie 'BroWars.jar' und 'browars-latest.jar' bereitstellen
+    copy {
+        from jarFile
+        into localBuildsDir
+        rename { "BroWars.jar" }
+    }
     copy {
         from jarFile
         into localBuildsDir

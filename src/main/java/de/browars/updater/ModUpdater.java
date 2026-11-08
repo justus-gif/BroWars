@@ -143,12 +143,26 @@ public class ModUpdater {
                 Files.copy(in, tempFile, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-
-            // Alte Datei entfernen
+            boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
             final Path oldJar = currentJarPath;
-            if (!oldJar.equals(targetFile)) {
-                cleanupOldJar(oldJar);
+            final Path finalTarget = targetFile;
+
+            if (isWindows) {
+                Path updateFile = modsDir.resolve("BroWars.jar.update");
+                Files.move(tempFile, updateFile, StandardCopyOption.REPLACE_EXISTING);
+
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    try {
+                        new ProcessBuilder("cmd", "/c",
+                                "timeout /t 2 /nobreak >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\" & move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\"")
+                                .start();
+                    } catch (Exception ignored) {}
+                }));
+            } else {
+                Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                if (!oldJar.equals(targetFile)) {
+                    Files.deleteIfExists(oldJar);
+                }
             }
 
             updateNotification = "§a[BroWars] Update auf v" + remoteVersion + " wurde automatisch heruntergeladen! Beim naechsten Spielstart ist es aktiv.";
@@ -156,24 +170,6 @@ public class ModUpdater {
 
         } catch (Exception e) {
             BroWarsMod.LOGGER.warn("[BroWars Updater] Fehler beim Pruefen auf Updates: {}", e.getMessage());
-        }
-    }
-
-    private static void cleanupOldJar(Path oldJar) {
-        try {
-            boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
-            if (isWindows) {
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    try {
-                        new ProcessBuilder("cmd", "/c", "timeout /t 2 /nobreak >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\"")
-                                .start();
-                    } catch (Exception ignored) {}
-                }));
-            } else {
-                Files.deleteIfExists(oldJar);
-            }
-        } catch (Exception e) {
-            BroWarsMod.LOGGER.warn("[BroWars Updater] Konnte alte Datei nicht loeschen: {}", e.getMessage());
         }
     }
 

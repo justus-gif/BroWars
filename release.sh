@@ -35,13 +35,16 @@ if [ ! -f "$JAR" ]; then
     exit 1
 fi
 
-echo "Veröffentliche Release $TAG auf GitHub..."
+CLEAN_JAR="Fertige Builds/BroWars.jar"
+cp "$JAR" "$CLEAN_JAR"
+
+echo "Veröffentliche Release $TAG auf GitHub (als BroWars.jar)..."
 # Falls Release bereits existiert, Datei aktualisieren, sonst neu erstellen
 if gh release view "$TAG" --repo "justus-gif/BroWars" &>/dev/null; then
-    echo "Release $TAG existiert bereits - aktualisiere Datei..."
-    gh release upload "$TAG" "$JAR" --repo "justus-gif/BroWars" --clobber
+    echo "Release $TAG existiert bereits - aktualisiere BroWars.jar..."
+    gh release upload "$TAG" "$CLEAN_JAR" --repo "justus-gif/BroWars" --clobber
 else
-    gh release create "$TAG" "$JAR" \
+    gh release create "$TAG" "$CLEAN_JAR" \
         --repo "justus-gif/BroWars" \
         --title "BroWars $TAG" \
         --notes "Automatisches Update für BroWars ($TAG)"

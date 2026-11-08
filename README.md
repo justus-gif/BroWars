@@ -73,13 +73,14 @@ Blöcke mit gespeicherten Daten sind als Spielfläche nicht erlaubt.
 - Verzögerte Teleporteffekte werden ohne Kopieren der gesamten Liste entfernt und beim Server-Stopp aufgeräumt.
 - Fertige Builds werden erst nach erfolgreichen Prüfungen kopiert.
 
-## Entwickeln und prüfen
+## Entwickeln und Release-Workflow
 
+- `./gradlew quickDeploy`: Schneller Build (~1 Sekunde), kopiert die fertige Mod direkt in den lokalen NoRiskClient-Modordner (`~/.local/share/noriskclientv3/profiles/BroWars/mods/`).
+- `./gradlew quickDeploy -t`: Live-Kompilierung im Hintergrund bei jedem Speichern.
+- `./release.sh`: Baut die Mod, erzeugt `Fertige Builds/BroWars.jar` und lädt das Release vollautomatisch auf GitHub (`justus-gif/BroWars`) hoch.
+- **Auto-Updater für Spieler:** Die Mod aktualisiert sich bei Freunden beim Spielstart automatisch über GitHub Releases.
+  - Download-Link: `https://github.com/justus-gif/BroWars/releases/latest/download/BroWars.jar`
 - `./gradlew minigameRegressionTest`: Geometrie, Arena-Speicherung, Punkte, Anvil-Fallkurve, Treffer, Eingabevalidierung und Spielwechsel.
-- `./gradlew runGametest`: Minecraft-Testserver mit echten Display-Entities und simulierten Spielern; prüft Aufprall, Aufräumen, alle drei Spielabläufe, Inventarwiederherstellung und Anvil Rain bis fünf Punkte.
-- `./gradlew build`: kompiliert und führt die Regressionstests aus. Die fertige JAR wird nach `Fertige Builds` und `../BroWars-FertigeBuilds` kopiert.
+- `./gradlew runGametest`: Minecraft-Testserver mit echten Display-Entities und simulierten Spielern.
+- `./gradlew build`: Vollständiger Build inklusive Gametest-Suite.
 
-Die Minecraft-Integrationstests stehen unter `src/gametest`, die eigenständigen Regressionstests unter
-`src/regression`. Der Test-Mod wird nicht in die ausgelieferte JAR aufgenommen.
-Eine alte BroWars-JAR im Minecraft-Mods-Ordner beim Aktualisieren entfernen.
-Automatische Prüfungen ersetzen keinen visuellen Spieltest mit zwei Minecraft-Clients.

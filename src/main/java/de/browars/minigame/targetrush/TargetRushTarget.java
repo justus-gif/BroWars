@@ -6,18 +6,21 @@ import net.minecraft.server.level.ServerLevel;
 
 public class TargetRushTarget {
     private final BlockPos pos;
+    private final net.minecraft.world.level.block.state.BlockState previousState;
     private final int spawnTick;
     private final int lifetimeTicks;
     private final ZoneTier tier;
 
-    public TargetRushTarget(BlockPos pos, int spawnTick, int lifetimeTicks, ZoneTier tier) {
+    public TargetRushTarget(BlockPos pos, net.minecraft.world.level.block.state.BlockState previousState, int spawnTick, int lifetimeTicks, ZoneTier tier) {
         this.pos = pos.immutable();
+        this.previousState = previousState;
         this.spawnTick = spawnTick;
         this.lifetimeTicks = lifetimeTicks;
         this.tier = tier;
     }
 
     public BlockPos getPos() { return pos; }
+    public net.minecraft.world.level.block.state.BlockState getPreviousState() { return previousState; }
     public int getSpawnTick() { return spawnTick; }
     public int getLifetimeTicks() { return lifetimeTicks; }
     public ZoneTier getTier() { return tier; }
