@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "browars:block/upward_booster_top",
+    "bottom": "browars:block/upward_booster_bottom",
+    "side": "browars:block/upward_booster_side"
+  }
+}

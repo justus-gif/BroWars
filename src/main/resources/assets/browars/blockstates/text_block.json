@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "browars:block/text_block"
+    }
+  }
+}

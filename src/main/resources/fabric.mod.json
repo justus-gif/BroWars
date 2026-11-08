@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "browars",
+  "version": "${version}",
+  "name": "BroWars",
+  "description": "Gameshow Teleporter und Area Mod fuer BroWars.",
+  "authors": [
+    "Justus"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/browars/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "de.browars.BroWarsMod"
+    ],
+    "client": [
+      "de.browars.client.BroWarsClientMod"
+    ]
+  },
+  "mixins": [
+    "browars.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": ">=26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "browars:block/teleport_target_block"
+    }
+  }
+}

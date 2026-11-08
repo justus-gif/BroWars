@@ -1,0 +1,166 @@
+plugins {
+    id 'fabric-loom' version '1.17.20'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
+}
+
+loom {
+    noIntermediateMappings()
+    runs {
+        server {
+            property "fabric.runtimeMappingNamespace", "named"
+        }
+    }
+}
+
+// A distributable JAR is only copied after both the fast checks and the
+// Minecraft server integration tests have passed.
+tasks.named('check') {
+    dependsOn 'runGametest'
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.layered {
+        mappings(file("empty.tiny"))
+    }
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 25
+    it.options.encoding = "UTF-8"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+ext.deployJarFiles = { File jarFile ->
+    def localBuildsDir = file("${projectDir}/Fertige Builds")
+    def parentBuildsDir = file("${projectDir}/../BroWars-FertigeBuilds")
+
+    localBuildsDir.mkdirs()
+    parentBuildsDir.mkdirs()
+
+    copy {
+        from jarFile
+        into localBuildsDir
+    }
+    copy {
+        from jarFile
+        into parentBuildsDir
+    }
+
+    // Feste Kopie 'browars-latest.jar' für Symlinks bereitstellen
+    copy {
+        from jarFile
+        into localBuildsDir
+        rename { "browars-latest.jar" }
+    }
+
+    // Automatischer Deploy in den Minecraft-Mod-Ordner (falls konfiguriert)
+    def deployTarget = project.findProperty('deploy_mods_dir') ?: System.getenv('MINECRAFT_MODS_DIR')
+    if (deployTarget) {
+        def deployDir = file(deployTarget.toString().replace("~", System.getProperty("user.home")))
+        if (deployDir.exists() && deployDir.isDirectory()) {
+            deployDir.listFiles().each { file ->
+                if (file.name.startsWith("browars") && file.name.endsWith(".jar")) {
+                    file.delete()
+                }
+            }
+            copy {
+                from jarFile
+                into deployDir
+            }
+            println "[BroWars] Mod automatisch aktualisiert in Mod-Ordner: ${deployDir.absolutePath}/${jarFile.name}"
+        }
+    }
+
+    println "[BroWars] Fertiger Build kopiert nach: ${localBuildsDir.absolutePath} und ${parentBuildsDir.absolutePath}"
+}
+
+tasks.register('quickDeploy') {
+    description = "Baut die Mod schnell ohne Gametests und kopiert sie direkt in den Mod-Ordner."
+    dependsOn tasks.named('remapJar')
+    doLast {
+        def jarTask = tasks.named('remapJar').get()
+        project.ext.deployJarFiles(jarTask.archiveFile.get().asFile)
+    }
+}
+
+tasks.register('copyFinishedBuild') {
+    dependsOn tasks.named('remapJar'), tasks.named('check')
+    doLast {
+        def jarTask = tasks.named('remapJar').get()
+        project.ext.deployJarFiles(jarTask.archiveFile.get().asFile)
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'copyFinishedBuild'
+}
+
+// Separate executable checks from framework-based tests, with the real Minecraft classpath.
+sourceSets {
+    regression {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+tasks.register('minigameRegressionTest', JavaExec) {
+    dependsOn tasks.named('regressionClasses')
+    classpath = sourceSets.regression.runtimeClasspath
+    mainClass = 'de.browars.MinigameRegressionChecks'
+}
+tasks.named('check') {
+    dependsOn 'minigameRegressionTest'
+}
+
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+loom {
+    mods {
+        browars { sourceSet sourceSets.main }
+        browars_tests { sourceSet sourceSets.gametest }
+    }
+    runs {
+        gametest {
+            server()
+            name = 'BroWars Game Tests'
+            source sourceSets.gametest
+            property 'fabric.runtimeMappingNamespace', 'named'
+            property 'fabric-api.gametest'
+            property 'fabric-api.gametest.report-file', "${projectDir}/build/reports/gametest.xml"
+            runDir 'build/gametest'
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "de.browars.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [
+    "FallingBlockMixin",
+    "PlayerDamageMixin",
+    "SlotMixin",
+    "FoodDataMixin",
+    "EntityAccessor",
+    "LivingEntityMixin",
+    "ServerGamePacketListenerImplMixin",
+    "EntityHitboxMixin",
+    "AbstractArrowMixin",
+    "DisplayAccess",
+    "BlockDisplayAccess",
+    "TextDisplayAccess"
+  ],
+  "client": [
+    "AbstractClientPlayerMixin",
+    "MinecraftClientMixin",
+    "AvatarRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

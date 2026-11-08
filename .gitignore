@@ -1,0 +1,14 @@
+.gradle/
+build/
+Fertige Builds/
+logs/
+run/
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.tmp
+*.log
