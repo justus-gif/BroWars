@@ -19,6 +19,16 @@ public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, Sky
     }
 
     @Override
+    public int getViewDistance() {
+        return 1024;
+    }
+
+    @Override
+    public boolean shouldRender(SkyBlockEntity blockEntity, Vec3 cameraPos) {
+        return true;
+    }
+
+    @Override
     public SkyBlockRenderState createRenderState() {
         return new SkyBlockRenderState();
     }
