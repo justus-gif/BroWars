@@ -38,6 +38,10 @@ public class GameshowProtectionManager {
     public static void register() {
         // 1. Prevent block break start / mining animation in survival
         AttackBlockCallback.EVENT.register((Player player, Level level, InteractionHand hand, BlockPos pos, net.minecraft.core.Direction direction) -> {
+            if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID()) && player.isCreative()) {
+                return InteractionResult.PASS;
+            }
+
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.paintwar.PaintWarGame paintWar
                     && paintWar.isRunning() && paintWar.isPlayerParticipating(player.getUUID())) {
                 if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
@@ -64,16 +68,13 @@ public class GameshowProtectionManager {
 
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
                     && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
-                if (vaultWar.isPlayerPlacedBlock(pos)) {
-                    if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
-                            && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                        vaultWar.removePlayerPlacedBlock(pos);
-                        serverLevel.destroyBlock(pos, true, serverPlayer);
-                        return InteractionResult.SUCCESS;
-                    }
-                    return InteractionResult.SUCCESS;
+                BlockState state = level.getBlockState(pos);
+                if (vaultWar.canBreak(pos, state)) {
+                    return InteractionResult.PASS;
                 }
-                sendActionBarWarning(player);
+                if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+                    serverPlayer.sendSystemMessage(Component.literal("§c[Vault War] Die Arena kann nicht abgebaut werden!"), true);
+                }
                 return InteractionResult.FAIL;
             }
 
@@ -103,6 +104,10 @@ public class GameshowProtectionManager {
 
         // 2. Prevent actual block break execution
         PlayerBlockBreakEvents.BEFORE.register((Level level, Player player, BlockPos pos, BlockState state, BlockEntity blockEntity) -> {
+            if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID()) && player.isCreative()) {
+                return true;
+            }
+
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.paintwar.PaintWarGame paintWar
                     && paintWar.isRunning() && paintWar.isPlayerParticipating(player.getUUID())) {
                 return false;
@@ -119,11 +124,13 @@ public class GameshowProtectionManager {
 
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
                     && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
-                if (vaultWar.isPlayerPlacedBlock(pos)) {
+                if (vaultWar.canBreak(pos, state)) {
                     vaultWar.removePlayerPlacedBlock(pos);
                     return true;
                 }
-                sendActionBarWarning(player);
+                if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+                    serverPlayer.sendSystemMessage(Component.literal("§c[Vault War] Die Arena kann nicht abgebaut werden!"), true);
+                }
                 return false;
             }
 
@@ -149,6 +156,10 @@ public class GameshowProtectionManager {
 
         // 3. Prevent block placing & block interactions (doors, trapdoors, chests, levers, etc.)
         UseBlockCallback.EVENT.register((Player player, Level level, InteractionHand hand, BlockHitResult hitResult) -> {
+            if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID()) && player.isCreative()) {
+                return InteractionResult.PASS;
+            }
+
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.paintwar.PaintWarGame paintWar
                     && paintWar.isRunning() && paintWar.isPlayerParticipating(player.getUUID())) {
                 if (hand == InteractionHand.MAIN_HAND) {

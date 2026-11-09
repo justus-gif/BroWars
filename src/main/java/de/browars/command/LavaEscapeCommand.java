@@ -1,7 +1,6 @@
 package de.browars.command;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -36,8 +35,10 @@ public class LavaEscapeCommand {
                                 .executes(ctx -> executeSetSpawn(ctx, 2))))
                 .then(Commands.literal("goal")
                         .executes(LavaEscapeCommand::executeSetGoal))
+                .then(Commands.literal("chests")
+                        .executes(LavaEscapeCommand::executeSetChests))
                 .then(Commands.literal("chestarea")
-                        .executes(LavaEscapeCommand::executeSetChestArea))
+                        .executes(LavaEscapeCommand::executeSetChests))
                 .then(Commands.literal("team")
                         .then(Commands.literal("1")
                                 .then(Commands.argument("farbe", StringArgumentType.word())
@@ -47,10 +48,6 @@ public class LavaEscapeCommand {
                                 .then(Commands.argument("farbe", StringArgumentType.word())
                                         .suggests(teamColorSuggestion)
                                         .executes(ctx -> executeSetTeamColor(ctx, 2)))))
-                .then(Commands.literal("targetscore")
-                        .executes(LavaEscapeCommand::executeShowTargetScore)
-                        .then(Commands.argument("punkte", IntegerArgumentType.integer(1, 10))
-                                .executes(LavaEscapeCommand::executeSetTargetScore)))
                 .then(Commands.literal("start")
                         .then(Commands.argument("spieler1", EntityArgument.player())
                                 .executes(LavaEscapeCommand::executeStartSolo)
@@ -147,34 +144,49 @@ public class LavaEscapeCommand {
 
         BlockPos min = saved.getData().getGoalMin();
         BlockPos max = saved.getData().getGoalMax();
+        int heightDiff = Math.abs(max.getY() - min.getY()) + 1;
         player.sendSystemMessage(Component.literal("§a[Lava Escape] Ziel-Bereich festgelegt: "
-                + min.toShortString() + " bis " + max.toShortString()), false);
+                + min.toShortString() + " bis " + max.toShortString() + " §7(Höhe: " + heightDiff + " Blöcke)"), false);
+        if (heightDiff > 10) {
+            player.sendSystemMessage(Component.literal("§e[Lava Escape] Tipp: Für das Ziel reicht meist die oberste Plattform. Der Sieg wird oben in der Zielzone ausgelöst!"), false);
+        }
         return 1;
     }
 
-    private static int executeSetChestArea(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+    private static int executeSetChests(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         BlockPos p1 = ArenaWandItem.POS1_MAP.get(player.getUUID());
         BlockPos p2 = ArenaWandItem.POS2_MAP.get(player.getUUID());
 
-        if (p1 == null || p2 == null || !ArenaWandItem.isSelectionInCurrentDimension(player)) {
-            player.sendSystemMessage(Component.literal("§c[Lava Escape] Bitte markiere zuerst mit dem Arena-Auswahlstab den Kisten-Bereich (Punkt 1 und Punkt 2)!"), false);
-            return 0;
-        }
+        LavaEscapeSavedData saved = LavaEscapeSavedData.get(player.level());
+        LavaEscapeArenaData arena = saved.getData();
 
         if (MinigameManager.getInstance().getActiveGame() instanceof LavaEscapeGame active && active.isRunning()) {
             player.sendSystemMessage(Component.literal("§c[Lava Escape] Stoppe das laufende Match vor Änderungen am Kistenbereich."), false);
             return 0;
         }
 
-        LavaEscapeSavedData saved = LavaEscapeSavedData.get(player.level());
-        saved.getData().setChestAreaBounds(p1, p2);
-        LavaEscapeSavedData.save(player.level());
+        BlockPos min;
+        BlockPos max;
 
-        BlockPos min = saved.getData().getChestAreaMin();
-        BlockPos max = saved.getData().getChestAreaMax();
-        player.sendSystemMessage(Component.literal("§a[Lava Escape] Kisten-Bereich festgelegt: "
-                + min.toShortString() + " bis " + max.toShortString()), false);
+        if (p1 != null && p2 != null && ArenaWandItem.isSelectionInCurrentDimension(player)) {
+            arena.setChestAreaBounds(p1, p2);
+            LavaEscapeSavedData.save(player.level());
+            min = arena.getChestAreaMin();
+            max = arena.getChestAreaMax();
+        } else if (arena.hasArena()) {
+            min = arena.getMinPos();
+            max = arena.getMaxPos();
+            arena.setChestAreaBounds(min, max);
+            LavaEscapeSavedData.save(player.level());
+        } else {
+            player.sendSystemMessage(Component.literal("§c[Lava Escape] Bitte markiere zuerst mit dem Arena-Auswahlstab den Kistenbereich oder lege zuerst die Arena fest!"), false);
+            return 0;
+        }
+
+        int placed = LavaEscapeGame.generateAndPlaceChests((net.minecraft.server.level.ServerLevel) player.level(), min, max);
+        player.sendSystemMessage(Component.literal("§a[Lava Escape] Kisten-Bereich festgelegt ("
+                + min.toShortString() + " bis " + max.toShortString() + ") und §e" + placed + " Kisten §amit Beute in der Arena platziert!"), false);
         return 1;
     }
 
@@ -198,27 +210,6 @@ public class LavaEscapeCommand {
 
         player.sendSystemMessage(Component.literal("§a[Lava Escape] Team " + teamNumber + " Standardfarbe auf "
                 + color.chatPrefix + color.displayName + " §agesetzt!"), false);
-        return 1;
-    }
-
-    private static int executeShowTargetScore(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        LavaEscapeSavedData saved = LavaEscapeSavedData.get(player.level());
-        int score = saved.getData().getTargetScore();
-        player.sendSystemMessage(Component.literal("§6[Lava Escape] Aktuelle Ziel-Punkteanzahl: §e" + score + " §7(First to " + score + ")"), false);
-        player.sendSystemMessage(Component.literal("§7Ändern mit: §e/browars lavaescape targetscore <1-10>"), false);
-        return 1;
-    }
-
-    private static int executeSetTargetScore(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        int score = IntegerArgumentType.getInteger(ctx, "punkte");
-
-        LavaEscapeSavedData saved = LavaEscapeSavedData.get(player.level());
-        saved.getData().setTargetScore(score);
-        LavaEscapeSavedData.save(player.level());
-
-        player.sendSystemMessage(Component.literal("§a[Lava Escape] Ziel-Punkteanzahl auf " + score + " gesetzt (First to " + score + ")!"), false);
         return 1;
     }
 
@@ -302,7 +293,6 @@ public class LavaEscapeCommand {
         ctx.getSource().sendSuccess(() -> Component.literal("§eKisten-Bereich: " + (arena.hasChestArea()
                 ? "§a" + arena.getChestAreaMin().toShortString() + " bis " + arena.getChestAreaMax().toShortString()
                 : "§7Standard (gesamte Arena)")), false);
-        ctx.getSource().sendSuccess(() -> Component.literal("§ePunkte für Sieg: §a" + arena.getTargetScore()), false);
         ctx.getSource().sendSuccess(() -> Component.literal("§eStandard-Farben: "
                 + arena.getTeam1ColorEnum().chatPrefix + arena.getTeam1Color() + " §7vs "
                 + arena.getTeam2ColorEnum().chatPrefix + arena.getTeam2Color()), false);

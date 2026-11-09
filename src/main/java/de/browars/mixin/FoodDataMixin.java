@@ -15,6 +15,12 @@ public class FoodDataMixin {
 
     @Inject(method = "addExhaustion", at = @At("HEAD"), cancellable = true)
     private void browars$preventExhaustion(float exhaustion, CallbackInfo ci) {
+        Minigame active = MinigameManager.getInstance().getActiveGame();
+        if (active instanceof de.browars.minigame.vaultwar.VaultWarGame
+                || active instanceof CrossWarGame
+                || active instanceof de.browars.minigame.lavaescape.LavaEscapeGame) {
+            return;
+        }
         ci.cancel();
     }
 
@@ -23,6 +29,12 @@ public class FoodDataMixin {
         Minigame active = MinigameManager.getInstance().getActiveGame();
         if (active instanceof CrossWarGame crossWar && crossWar.isRoundActive() && crossWar.isPlayerParticipating(player.getUUID())) {
             ci.cancel();
+            return;
+        }
+        if (active instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
+            return;
+        }
+        if (active instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
             return;
         }
 

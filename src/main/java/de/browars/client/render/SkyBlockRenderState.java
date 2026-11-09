@@ -1,19 +1,12 @@
 package de.browars.client.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.core.Direction;
 
-public class SkyBlockRenderState extends BlockEntityRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-    public byte visibleFacesMask;
+import java.util.EnumSet;
+import java.util.Set;
 
-    @Override
-    public void render(PoseStack.Pose pose, VertexConsumer consumer) {
-        for (int i = 0; i < 6; i++) {
-            if ((this.visibleFacesMask & (1 << i)) != 0) {
-                SkyBlockRenderer.renderFace(pose, consumer, i);
-            }
-        }
-    }
+public class SkyBlockRenderState extends BlockEntityRenderState {
+    public final Set<Direction> facesToShow = EnumSet.noneOf(Direction.class);
 }
+

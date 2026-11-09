@@ -145,46 +145,42 @@ public class VaultWarCommand {
         int depth = max.getZ() - min.getZ() + 1;
 
         ServerLevel level = (ServerLevel) player.level();
-        String detectedBlock = null;
-        boolean allAir = true;
+        java.util.List<VaultWarArenaData.SavedFenceBlock> blocks = new java.util.ArrayList<>();
+        String primaryBlock = null;
 
-        for (int x = min.getX(); x <= max.getX() && detectedBlock == null; x++) {
-            for (int y = min.getY(); y <= max.getY() && detectedBlock == null; y++) {
-                for (int z = min.getZ(); z <= max.getZ() && detectedBlock == null; z++) {
-                    net.minecraft.world.level.block.state.BlockState st = level.getBlockState(new BlockPos(x, y, z));
+        for (int x = min.getX(); x <= max.getX(); x++) {
+            for (int y = min.getY(); y <= max.getY(); y++) {
+                for (int z = min.getZ(); z <= max.getZ(); z++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+                    net.minecraft.world.level.block.state.BlockState st = level.getBlockState(pos);
                     if (!st.isAir()) {
-                        allAir = false;
-                        detectedBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
+                        blocks.add(new VaultWarArenaData.SavedFenceBlock(pos.immutable(), st));
+                        if (primaryBlock == null) {
+                            primaryBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
+                        }
                     }
                 }
             }
         }
 
-        if (detectedBlock != null) {
-            saved.getData().setFenceBlock(detectedBlock);
+        if (!blocks.isEmpty()) {
+            saved.getData().setSavedFenceBlocks(blocks);
+            if (primaryBlock != null) {
+                saved.getData().setFenceBlock(primaryBlock);
+            }
+            VaultWarSavedData.save(player.level());
+            player.sendSystemMessage(Component.literal("§a[Vault War] Trennzaun erfolgreich gespeichert! "
+                    + blocks.size() + " Blöcke gesichert: "
+                    + min.toShortString() + " bis " + max.toShortString()
+                    + " §7(" + width + "×" + height + "×" + depth + ", " + (primaryBlock != null ? primaryBlock : "") + ")"), false);
         } else {
-            saved.getData().setFenceBlock("minecraft:iron_bars");
+            saved.getData().setSavedFenceBlocks(java.util.List.of());
+            VaultWarSavedData.save(player.level());
+            player.sendSystemMessage(Component.literal("§e[Vault War] Trennzaun-Bereich festgelegt ("
+                    + min.toShortString() + " bis " + max.toShortString()
+                    + "), aber keine Blöcke vorgefunden. Baue deinen Zaun und führe den Befehl erneut aus oder starte das Spiel."), false);
         }
 
-        if (allAir) {
-            var defaultBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK
-                    .getOptional(net.minecraft.resources.Identifier.tryParse(saved.getData().getFenceBlock()))
-                    .orElse(net.minecraft.world.level.block.Blocks.IRON_BARS);
-            net.minecraft.world.level.block.state.BlockState placeState = defaultBlock.defaultBlockState();
-            for (int x = min.getX(); x <= max.getX(); x++) {
-                for (int y = min.getY(); y <= max.getY(); y++) {
-                    for (int z = min.getZ(); z <= max.getZ(); z++) {
-                        level.setBlock(new BlockPos(x, y, z), placeState, 3);
-                    }
-                }
-            }
-        }
-
-        VaultWarSavedData.save(player.level());
-
-        player.sendSystemMessage(Component.literal("§a[Vault War] Trennzaun erfolgreich festgelegt: "
-                + min.toShortString() + " bis " + max.toShortString()
-                + " §7(" + width + "×" + height + "×" + depth + ", " + saved.getData().getFenceBlock() + ")"), false);
         return 1;
     }
 

@@ -33,7 +33,7 @@ public class GamemodeCommand {
 
         // Top-level /gm <mode> [targets]
         dispatcher.register(Commands.literal("gm")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(GamemodeCommand::hasGmPermission)
                 .then(Commands.argument("mode", StringArgumentType.word())
                         .suggests(modeSuggestion)
                         .executes(ctx -> executeGmSelf(ctx, StringArgumentType.getString(ctx, "mode")))
@@ -42,28 +42,35 @@ public class GamemodeCommand {
 
         // Top-level shortcuts /gmc, /gms, /gma, /gmsp
         dispatcher.register(Commands.literal("gmc")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(GamemodeCommand::hasGmPermission)
                 .executes(ctx -> executeGmSelf(ctx, "c"))
                 .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> executeGmTargets(ctx, "c", EntityArgument.getPlayers(ctx, "targets")))));
 
         dispatcher.register(Commands.literal("gms")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(GamemodeCommand::hasGmPermission)
                 .executes(ctx -> executeGmSelf(ctx, "s"))
                 .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> executeGmTargets(ctx, "s", EntityArgument.getPlayers(ctx, "targets")))));
 
         dispatcher.register(Commands.literal("gma")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(GamemodeCommand::hasGmPermission)
                 .executes(ctx -> executeGmSelf(ctx, "a"))
                 .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> executeGmTargets(ctx, "a", EntityArgument.getPlayers(ctx, "targets")))));
 
         dispatcher.register(Commands.literal("gmsp")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(GamemodeCommand::hasGmPermission)
                 .executes(ctx -> executeGmSelf(ctx, "sp"))
                 .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> executeGmTargets(ctx, "sp", EntityArgument.getPlayers(ctx, "targets")))));
+    }
+
+    public static boolean hasGmPermission(CommandSourceStack source) {
+        if (Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source)) return true;
+        if (source.getServer() != null && source.getServer().isSingleplayer()) return true;
+        if (source.getEntity() instanceof ServerPlayer sp && (sp.isCreative() || de.browars.util.PermissionsHelper.isOp(sp))) return true;
+        return false;
     }
 
     public static int executeGmSelf(CommandContext<CommandSourceStack> ctx, String modeInput) throws CommandSyntaxException {

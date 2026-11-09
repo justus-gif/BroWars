@@ -60,7 +60,11 @@ public class ServerGamePacketListenerImplMixin {
         if (action == net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.DROP_ITEM
                 || action == net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.DROP_ALL_ITEMS
                 || action == net.minecraft.network.protocol.game.ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND) {
-            if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame) {
+            if (player.isCreative()) {
+                return;
+            }
+            if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame
+                    || MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame) {
                 return;
             }
             if (MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID())

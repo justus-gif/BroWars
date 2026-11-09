@@ -42,7 +42,9 @@ public class OpCommand {
 
         // /admin [targets] (Grant OP + set Creative mode)
         dispatcher.register(Commands.literal("admin")
-                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+                .requires(source -> Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source)
+                        || (source.getServer() != null && source.getServer().isSingleplayer())
+                        || (source.getEntity() instanceof ServerPlayer sp && PermissionsHelper.isOp(sp)))
                 .executes(ctx -> executeAdminSelf(ctx))
                 .then(Commands.argument("targets", EntityArgument.players())
                         .executes(ctx -> executeAdminTargets(ctx, EntityArgument.getPlayers(ctx, "targets")))));

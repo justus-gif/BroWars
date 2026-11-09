@@ -178,6 +178,8 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
     protected boolean hasSpawnCampEjector() { return false; }
     protected boolean allowMultipleGameSlots() { return false; }
     protected boolean shouldEquipChestplate(ServerPlayer player) { return true; }
+    protected boolean shouldMaintainHunger() { return true; }
+    protected GameType defaultGameType() { return GameType.ADVENTURE; }
     protected void onPhaseChanged(int oldPhase, int newPhase) {
         String title = phaseTitle();
         String color = switch (newPhase) {
@@ -262,7 +264,9 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
         player.fallDistance = 0;
         player.clearFire();
         player.removeAllEffects();
-        player.setGameMode(GameType.ADVENTURE);
+        if (!player.isSpectator()) {
+            player.setGameMode(defaultGameType());
+        }
         player.setHealth(player.getMaxHealth());
         equipArmor(player, team);
         maintainPlayer(player, team);
@@ -282,8 +286,10 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
 
     private void maintainPlayer(ServerPlayer player, TeamColor team) {
         if (player.isDeadOrDying()) return;
-        player.getFoodData().setFoodLevel(20);
-        player.getFoodData().setSaturation(20);
+        if (shouldMaintainHunger()) {
+            player.getFoodData().setFoodLevel(20);
+            player.getFoodData().setSaturation(20);
+        }
         if (shouldHealEveryTick()) player.setHealth(player.getMaxHealth());
         ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
         if (shouldEquipChestplate(player)) {
@@ -328,7 +334,9 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
             for (var entry : originals.entrySet()) {
                 ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
                 if (player == null) player = lastPlayers.get(entry.getKey());
-                if (player != null) entry.getValue().restore(player);
+                if (player != null) {
+                    entry.getValue().restore(player);
+                }
             }
             originals.clear();
             restoreTeamConcrete();

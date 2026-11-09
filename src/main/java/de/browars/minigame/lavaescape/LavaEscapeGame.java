@@ -75,9 +75,11 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         return false; // Full survival & PvP damage
     }
 
+    private final Set<UUID> equippedPlayers = new HashSet<>();
+
     @Override
     protected int targetScore() {
-        return arena.getTargetScore();
+        return 2; // Standard Best of 3 (First to 2 points)
     }
 
     @Override
@@ -155,10 +157,14 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         currentSpeed = MIN_SPEED;
 
         ServerPlayer p1 = server.getPlayerList().getPlayer(p1Uuid);
-        if (p1 != null) p1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        if (p1 != null && !p1.isCreative() && !p1.isSpectator()) {
+            p1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        }
         if (p2Uuid != null) {
             ServerPlayer p2 = server.getPlayerList().getPlayer(p2Uuid);
-            if (p2 != null) p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+            if (p2 != null && !p2.isCreative() && !p2.isSpectator()) {
+                p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+            }
         }
 
         message("§6[Lava Escape] Die Schonfrist läuft! In §e5 Sekunden §6beginnt die Lava zu steigen!");
@@ -166,23 +172,28 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
     @Override
     protected void equipExtra(ServerPlayer player) {
-        player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        if (!player.isCreative() && !player.isSpectator() && player.gameMode.getGameModeForPlayer() == net.minecraft.world.level.GameType.ADVENTURE) {
+            player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        }
 
-        ItemStack sword = new ItemStack(Items.STONE_SWORD);
-        MinigamePlayerState.markGameItem(sword);
-        player.getInventory().setItem(0, sword);
+        // Give starter gear EXACTLY ONCE per round: 32 Cobblestone, 1 Wooden Sword, 8 Beef
+        if (equippedPlayers.add(player.getUUID())) {
+            for (int i = 0; i < 36; i++) {
+                player.getInventory().setItem(i, ItemStack.EMPTY);
+            }
 
-        ItemStack pickaxe = new ItemStack(Items.STONE_PICKAXE);
-        MinigamePlayerState.markGameItem(pickaxe);
-        player.getInventory().setItem(1, pickaxe);
+            ItemStack sword = new ItemStack(Items.WOODEN_SWORD);
+            MinigamePlayerState.markGameItem(sword);
+            player.getInventory().setItem(0, sword);
 
-        ItemStack blocks = new ItemStack(Items.COBBLESTONE, 8);
-        MinigamePlayerState.markGameItem(blocks);
-        player.getInventory().setItem(2, blocks);
+            ItemStack blocks = new ItemStack(Items.COBBLESTONE, 32);
+            MinigamePlayerState.markGameItem(blocks);
+            player.getInventory().setItem(1, blocks);
 
-        ItemStack food = new ItemStack(Items.COOKED_BEEF, 8);
-        MinigamePlayerState.markGameItem(food);
-        player.getInventory().setItem(8, food);
+            ItemStack food = new ItemStack(Items.COOKED_BEEF, 8);
+            MinigamePlayerState.markGameItem(food);
+            player.getInventory().setItem(8, food);
+        }
     }
 
     @Override
@@ -255,15 +266,21 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
     private boolean isPlayerAtGoal(ServerPlayer player) {
         if (player == null || player.isDeadOrDying() || player.level() != level) return false;
+        if (player.isCreative() || player.isSpectator()) return false;
         if (!arena.hasGoal()) {
             // Default goal: reaching topmost layer of the arena
             return player.getY() >= arena.getMaxPos().getY() - 0.5 && arena.isInsideArena(player.blockPosition());
         }
+        // Protect against huge goal selections encompassing the lower arena/spawns
+        int minGoalThresholdY = Math.max(arena.getGoalMin().getY(), arena.getGoalMax().getY() - 5);
+        if (player.getY() < minGoalThresholdY) return false;
+
         return arena.isInsideGoal(player.getBoundingBox()) || arena.isInsideGoal(player.blockPosition());
     }
 
     private boolean isPlayerInLava(ServerPlayer player) {
         if (player == null || player.isDeadOrDying() || player.level() != level) return false;
+        if (player.isCreative() || player.isSpectator()) return false;
         if (player.isInLava()) return true;
 
         BlockPos feetPos = player.blockPosition();
@@ -342,7 +359,7 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
                     if (state.is(Blocks.CHEST) || state.is(Blocks.BARREL)) {
                         BlockPos imm = mpos.immutable();
                         chestPositions.add(imm);
-                        populateChest(imm, random);
+                        populateChestStatic(level, imm, random);
                     }
                 }
             }
@@ -371,21 +388,34 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
                 for (int z = startZ; z <= endZ; z++) {
                     mpos.set(x, y, z);
                     BlockState floor = level.getBlockState(mpos);
-                    if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER)) continue;
-                    if (floor.getCollisionShape(level, mpos).isEmpty()) continue;
+                    if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER) || floor.is(Blocks.CHEST) || floor.is(Blocks.BARREL)) continue;
+                    if (!floor.isSolid() && floor.getCollisionShape(level, mpos).isEmpty()) continue;
 
                     BlockPos chestPos = mpos.above();
                     if (chestPositions.contains(chestPos)) continue;
 
                     BlockState chestSpace = level.getBlockState(chestPos);
-                    if (!chestSpace.isAir() && !chestSpace.canBeReplaced()) continue;
-                    if (arena.isInsideGoal(chestPos)) continue;
+                    if (!chestSpace.isAir() && !chestSpace.canBeReplaced() && !chestSpace.is(Blocks.CHEST)) continue;
 
                     // Avoid spawning directly on top of player spawns
                     if (isNearSpawn(chestPos, 1) || isNearSpawn(chestPos, 2)) continue;
 
                     validPlatforms.add(chestPos.immutable());
                 }
+            }
+        }
+
+        if (validPlatforms.isEmpty()) {
+            int cx = (startX + endX) / 2;
+            int cz = (startZ + endZ) / 2;
+            for (int y = minY + 4; y < maxY - 2; y += 12) {
+                BlockPos floorPos = new BlockPos(cx, y, cz);
+                arenaSnapshot.putIfAbsent(floorPos, level.getBlockState(floorPos));
+                level.setBlock(floorPos, Blocks.COBBLESTONE.defaultBlockState(), 3);
+
+                BlockPos chestPos = floorPos.above();
+                arenaSnapshot.putIfAbsent(chestPos, level.getBlockState(chestPos));
+                validPlatforms.add(chestPos);
             }
         }
 
@@ -407,13 +437,73 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
             level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
             chestPositions.add(cPos);
-            populateChest(cPos, random);
+            populateChestStatic(level, cPos, random);
         }
 
         de.browars.BroWarsMod.LOGGER.info("[Lava Escape] Insgesamt {} Kisten bereitgestellt.", chestPositions.size());
     }
 
-    private void populateChest(BlockPos pos, RandomSource random) {
+    public static int generateAndPlaceChests(ServerLevel level, BlockPos p1, BlockPos p2) {
+        int minX = Math.min(p1.getX(), p2.getX());
+        int maxX = Math.max(p1.getX(), p2.getX());
+        int minY = Math.min(p1.getY(), p2.getY());
+        int maxY = Math.max(p1.getY(), p2.getY());
+        int minZ = Math.min(p1.getZ(), p2.getZ());
+        int maxZ = Math.max(p1.getZ(), p2.getZ());
+
+        RandomSource random = level.getRandom();
+        BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+
+        List<BlockPos> validPlatforms = new ArrayList<>();
+
+        for (int y = minY; y <= maxY - 1; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    mpos.set(x, y, z);
+                    BlockState floor = level.getBlockState(mpos);
+                    if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER) || floor.is(Blocks.CHEST) || floor.is(Blocks.BARREL)) continue;
+                    if (!floor.isSolid() && floor.getCollisionShape(level, mpos).isEmpty()) continue;
+
+                    BlockPos chestPos = mpos.above();
+                    BlockState chestSpace = level.getBlockState(chestPos);
+                    if (!chestSpace.isAir() && !chestSpace.canBeReplaced() && !chestSpace.is(Blocks.CHEST)) continue;
+
+                    validPlatforms.add(chestPos.immutable());
+                }
+            }
+        }
+
+        if (validPlatforms.isEmpty()) {
+            int cx = (minX + maxX) / 2;
+            int cz = (minZ + maxZ) / 2;
+            for (int y = minY + 4; y < maxY - 2; y += 12) {
+                BlockPos floorPos = new BlockPos(cx, y, cz);
+                level.setBlock(floorPos, Blocks.COBBLESTONE.defaultBlockState(), 3);
+                validPlatforms.add(floorPos.above());
+            }
+        }
+
+        if (validPlatforms.isEmpty()) return 0;
+
+        Collections.shuffle(validPlatforms, new java.util.Random(random.nextLong()));
+        validPlatforms.sort(Comparator.comparingInt(BlockPos::getY));
+
+        int height = maxY - minY + 1;
+        int desiredChests = Math.max(4, Math.min(25, height / 3));
+        int step = Math.max(1, validPlatforms.size() / Math.max(1, desiredChests));
+
+        int placed = 0;
+        for (int i = 0; i < validPlatforms.size() && placed < desiredChests; i += step) {
+            BlockPos cPos = validPlatforms.get(i);
+            level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
+            populateChestStatic(level, cPos, random);
+            placed++;
+        }
+
+        return placed;
+    }
+
+    public static void populateChestStatic(ServerLevel level, BlockPos pos, RandomSource random) {
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof ChestBlockEntity chest) {
             chest.clearContent();
@@ -425,6 +515,7 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
             for (int idx = 0; idx < loot.size() && idx < slots.size(); idx++) {
                 chest.setItem(slots.get(idx), loot.get(idx));
             }
+            chest.setChanged();
         }
     }
 
@@ -433,12 +524,13 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         double dx = pos.getX() + 0.5 - sp.x();
         double dy = pos.getY() + 0.5 - sp.y();
         double dz = pos.getZ() + 0.5 - sp.z();
-        return (dx * dx + dz * dz < 2.5 * 2.5 && Math.abs(dy) < 3.0);
+        return (dx * dx + dz * dz < 1.5 * 1.5 && Math.abs(dy) < 2.5);
     }
 
     @Override
     protected void clearRound() {
         restoreArena();
+        equippedPlayers.clear();
         ServerPlayer p1 = server.getPlayerList().getPlayer(p1Uuid);
         if (p1 != null) p1.clearFire();
         if (p2Uuid != null) {

@@ -60,9 +60,23 @@ public class PlayerDamageMixin {
             return;
         }
 
+        if (active instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
+                && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(victim.getUUID())) {
+            if (!lavaEscape.isRoundActive()) {
+                cir.setReturnValue(false);
+                return;
+            }
+            return;
+        }
+
         if (active instanceof de.browars.minigame.AbstractDuelGame<?> game
                 && game.isRunning() && game.isPlayerParticipating(victim.getUUID())) {
             cir.setReturnValue(false);
+            return;
+        }
+
+        // Creative players can deal damage freely
+        if (source.getEntity() instanceof Player p && p.isCreative()) {
             return;
         }
 

@@ -534,6 +534,9 @@ public class BroWarsMod implements ModInitializer {
                 if (level.isClientSide()) {
                     return net.minecraft.world.InteractionResult.PASS;
                 }
+                if (player.isCreative()) {
+                    return net.minecraft.world.InteractionResult.PASS;
+                }
                 de.browars.minigame.Minigame active = de.browars.minigame.MinigameManager.getInstance().getActiveGame();
                 if (active instanceof de.browars.minigame.sumo.SumoGame sumo && sumo.isFightActive()
                         && sumo.isPlayerParticipating(player.getUUID())
@@ -554,6 +557,15 @@ public class BroWarsMod implements ModInitializer {
                         && vaultWar.isPlayerParticipating(player.getUUID())
                         && vaultWar.isPlayerParticipating(targetPlayer.getUUID())) {
                     if (vaultWar.isCombatActive()) {
+                        return net.minecraft.world.InteractionResult.PASS;
+                    }
+                    return net.minecraft.world.InteractionResult.FAIL;
+                }
+                if (active instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
+                        && lavaEscape.isRunning()
+                        && lavaEscape.isPlayerParticipating(player.getUUID())
+                        && lavaEscape.isPlayerParticipating(targetPlayer.getUUID())) {
+                    if (lavaEscape.isRoundActive()) {
                         return net.minecraft.world.InteractionResult.PASS;
                     }
                     return net.minecraft.world.InteractionResult.FAIL;

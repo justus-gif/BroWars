@@ -10,36 +10,22 @@ import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
-import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
 
 public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, SkyBlockRenderState> {
-    private static final double MAX_RENDER_DISTANCE = 1024.0;
-    private static final double MAX_RENDER_DISTANCE_SQ = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
 
     public SkyBlockRenderer(BlockEntityRendererProvider.Context context) {
     }
 
     @Override
     public int getViewDistance() {
-        return (int) MAX_RENDER_DISTANCE;
+        return 1024;
     }
 
     @Override
     public boolean shouldRender(SkyBlockEntity blockEntity, Vec3 cameraPos) {
-        // 1. High-performance allocation-free squared distance check (up to 1024m)
-        BlockPos pos = blockEntity.getBlockPos();
-        double dx = (pos.getX() + 0.5) - cameraPos.x;
-        double dy = (pos.getY() + 0.5) - cameraPos.y;
-        double dz = (pos.getZ() + 0.5) - cameraPos.z;
-        if ((dx * dx + dy * dy + dz * dz) > MAX_RENDER_DISTANCE_SQ) {
-            return false;
-        }
-
-        // 2. Cull immediately if all 6 neighbor faces are covered
-        // Evaluated fresh every frame: zero stale cache, zero missing faces
-        byte mask = blockEntity.computeVisibleFaces();
-        return mask != 0;
+        return true;
     }
 
     @Override
@@ -50,53 +36,37 @@ public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, Sky
     @Override
     public void extractRenderState(SkyBlockEntity entity, SkyBlockRenderState state, float partialTick, Vec3 cameraPos, ModelFeatureRenderer.CrumblingOverlay overlay) {
         BlockEntityRenderState.extractBase(entity, state, overlay);
-        state.visibleFacesMask = entity.getLastVisibleMask();
+        state.facesToShow.clear();
+        for (Direction dir : Direction.values()) {
+            if (entity.shouldRenderFace(dir)) {
+                state.facesToShow.add(dir);
+            }
+        }
     }
 
     @Override
     public void submit(SkyBlockRenderState state, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
-        if (state.visibleFacesMask == 0) return;
-        submitNodeCollector.submitCustomGeometry(poseStack, RenderTypes.waterMask(), state);
+        if (state.facesToShow.isEmpty()) return;
+
+        submitNodeCollector.submitCustomGeometry(poseStack, RenderTypes.waterMask(), (pose, consumer) -> {
+            for (Direction dir : state.facesToShow) {
+                renderFace(pose, consumer, dir);
+            }
+        });
     }
 
-    public static void renderFace(PoseStack.Pose pose, VertexConsumer consumer, int dirIndex) {
-        switch (dirIndex) {
-            case 0 -> { // DOWN (Y = 0)
-                consumer.addVertex(pose, 0.0f, 0.0f, 1.0f);
-                consumer.addVertex(pose, 0.0f, 0.0f, 0.0f);
-                consumer.addVertex(pose, 1.0f, 0.0f, 0.0f);
-                consumer.addVertex(pose, 1.0f, 0.0f, 1.0f);
-            }
-            case 1 -> { // UP (Y = 1)
-                consumer.addVertex(pose, 0.0f, 1.0f, 0.0f);
-                consumer.addVertex(pose, 0.0f, 1.0f, 1.0f);
-                consumer.addVertex(pose, 1.0f, 1.0f, 1.0f);
-                consumer.addVertex(pose, 1.0f, 1.0f, 0.0f);
-            }
-            case 2 -> { // NORTH (Z = 0)
-                consumer.addVertex(pose, 1.0f, 1.0f, 0.0f);
-                consumer.addVertex(pose, 1.0f, 0.0f, 0.0f);
-                consumer.addVertex(pose, 0.0f, 0.0f, 0.0f);
-                consumer.addVertex(pose, 0.0f, 1.0f, 0.0f);
-            }
-            case 3 -> { // SOUTH (Z = 1)
-                consumer.addVertex(pose, 0.0f, 1.0f, 1.0f);
-                consumer.addVertex(pose, 0.0f, 0.0f, 1.0f);
-                consumer.addVertex(pose, 1.0f, 0.0f, 1.0f);
-                consumer.addVertex(pose, 1.0f, 1.0f, 1.0f);
-            }
-            case 4 -> { // WEST (X = 0)
-                consumer.addVertex(pose, 0.0f, 1.0f, 0.0f);
-                consumer.addVertex(pose, 0.0f, 0.0f, 0.0f);
-                consumer.addVertex(pose, 0.0f, 0.0f, 1.0f);
-                consumer.addVertex(pose, 0.0f, 1.0f, 1.0f);
-            }
-            case 5 -> { // EAST (X = 1)
-                consumer.addVertex(pose, 1.0f, 1.0f, 1.0f);
-                consumer.addVertex(pose, 1.0f, 0.0f, 1.0f);
-                consumer.addVertex(pose, 1.0f, 0.0f, 0.0f);
-                consumer.addVertex(pose, 1.0f, 1.0f, 0.0f);
-            }
+    public static void renderFace(PoseStack.Pose pose, VertexConsumer consumer, Direction dir) {
+        float[][] vCoords = switch (dir) {
+            case UP -> new float[][]{ {0, 1, 0}, {0, 1, 1}, {1, 1, 1}, {1, 1, 0} };
+            case DOWN -> new float[][]{ {0, 0, 1}, {0, 0, 0}, {1, 0, 0}, {1, 0, 1} };
+            case NORTH -> new float[][]{ {1, 1, 0}, {1, 0, 0}, {0, 0, 0}, {0, 1, 0} };
+            case SOUTH -> new float[][]{ {0, 1, 1}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1} };
+            case WEST -> new float[][]{ {0, 1, 0}, {0, 0, 0}, {0, 0, 1}, {0, 1, 1} };
+            case EAST -> new float[][]{ {1, 1, 1}, {1, 0, 1}, {1, 0, 0}, {1, 1, 0} };
+        };
+
+        for (int i = 0; i < 4; i++) {
+            consumer.addVertex(pose, vCoords[i][0], vCoords[i][1], vCoords[i][2]);
         }
     }
 }

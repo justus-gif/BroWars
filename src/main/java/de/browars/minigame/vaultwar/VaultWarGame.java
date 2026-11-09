@@ -25,6 +25,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -40,7 +41,7 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         SUDDEN_DEATH
     }
 
-    private static final int LOOT_DURATION_TICKS = 1200; // 60 seconds (1 minute)
+    private static final int LOOT_DURATION_TICKS = 1800; // 90 seconds (1:30 minutes)
     private static final int COMBAT_LIMIT_TICKS = 12000;  // 10 minutes
     private static final int NORMAL_KEYS = 25;
     private static final int OMINOUS_KEYS = 5;
@@ -89,7 +90,12 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
 
     @Override
     protected boolean shouldHealEveryTick() {
-        return phase != Phase.PLAYING || vaultPhase == VaultPhase.LOOTING;
+        return false;
+    }
+
+    @Override
+    protected boolean shouldMaintainHunger() {
+        return false;
     }
 
     @Override
@@ -158,6 +164,36 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         playerPlacedBlocks.remove(pos);
     }
 
+    public boolean canBreak(BlockPos pos, BlockState state) {
+        if (!isRunning() || !arena.isInsideArena(pos)) return false;
+        // Never allow breaking the dividing fence
+        if (arena.hasFence()) {
+            BlockPos fMin = arena.getFenceMin();
+            BlockPos fMax = arena.getFenceMax();
+            int minX = Math.min(fMin.getX(), fMax.getX());
+            int maxX = Math.max(fMin.getX(), fMax.getX());
+            int minY = Math.min(fMin.getY(), fMax.getY());
+            int maxY = Math.max(fMin.getY(), fMax.getY());
+            int minZ = Math.min(fMin.getZ(), fMax.getZ());
+            int maxZ = Math.max(fMin.getZ(), fMax.getZ());
+            if (pos.getX() >= minX && pos.getX() <= maxX
+                    && pos.getY() >= minY && pos.getY() <= maxY
+                    && pos.getZ() >= minZ && pos.getZ() <= maxZ) {
+                return false;
+            }
+        }
+        // Always allow breaking vaults, utility stations, cobwebs, and player placed blocks
+        if (state.is(Blocks.VAULT)
+                || state.is(Blocks.ANVIL)
+                || state.is(Blocks.CHIPPED_ANVIL)
+                || state.is(Blocks.DAMAGED_ANVIL)
+                || state.is(Blocks.CRAFTING_TABLE)
+                || state.is(Blocks.COBWEB)) {
+            return true;
+        }
+        return isPlayerPlacedBlock(pos);
+    }
+
     public boolean isVaultOnCooldown(BlockPos pos) {
         return getVaultCooldownTicks(pos) > 0;
     }
@@ -222,8 +258,8 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
             if (p2 != null) setupPlayerForLooting(p2);
         }
 
-        message("§eDie 60-sekündige Loot-Phase hat begonnen! Öffne Vaults & nutze den Amboss!");
-        setCenterTitle("§6§lLOOT-PHASE!", "60 Sekunden Zeit!", 0xFFF59E0B, 40);
+        message("§eDie 1:30-minütige Loot-Phase hat begonnen! Öffne Vaults & nutze den Amboss!");
+        setCenterTitle("§6§lLOOT-PHASE!", "1:30 Minuten Zeit!", 0xFFF59E0B, 40);
         playSound(SoundEvents.NOTE_BLOCK_BELL, 1.0f);
         playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8f);
     }
@@ -234,7 +270,7 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         player.removeAllEffects();
         player.setHealth(player.getMaxHealth());
         player.getFoodData().setFoodLevel(20);
-        player.getFoodData().setSaturation(20.0f);
+        player.getFoodData().setSaturation(5.0f);
         player.setExperienceLevels(START_XP_LEVELS);
         player.experienceProgress = 0.0f;
 
@@ -250,6 +286,13 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
 
     @Override
     protected void tickRound(ServerPlayer first, ServerPlayer second) {
+        if (first.gameMode.getGameModeForPlayer() != GameType.SURVIVAL) {
+            first.setGameMode(GameType.SURVIVAL);
+        }
+        if (second != null && second.gameMode.getGameModeForPlayer() != GameType.SURVIVAL) {
+            second.setGameMode(GameType.SURVIVAL);
+        }
+
         if (vaultPhase == VaultPhase.LOOTING) {
             lootingTicksLeft--;
 
@@ -348,25 +391,33 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
             int maxY = Math.max(min.getY(), max.getY());
             int maxZ = Math.max(min.getZ(), max.getZ());
 
-            Block defaultBlock = BuiltInRegistries.BLOCK
-                    .getOptional(Identifier.tryParse(arena.getFenceBlock()))
-                    .orElse(Blocks.IRON_BARS);
-            BlockState fallbackFence = defaultBlock.defaultBlockState();
+            originalFenceBlocks.clear();
 
+            List<VaultWarArenaData.SavedFenceBlock> currentWorldBlocks = new ArrayList<>();
             for (int x = minX; x <= maxX; x++) {
                 for (int y = minY; y <= maxY; y++) {
                     for (int z = minZ; z <= maxZ; z++) {
                         BlockPos p = new BlockPos(x, y, z);
                         BlockState st = level.getBlockState(p);
                         if (!st.isAir()) {
-                            originalFenceBlocks.put(p, st);
-                        } else {
-                            originalFenceBlocks.putIfAbsent(p, fallbackFence);
+                            currentWorldBlocks.add(new VaultWarArenaData.SavedFenceBlock(p.immutable(), st));
+                            originalFenceBlocks.put(p.immutable(), st);
                         }
                     }
                 }
             }
-            restoreFence();
+
+            if (!currentWorldBlocks.isEmpty()) {
+                // User has built/modified the fence in the world! Persist these exact blocks to saved data.
+                arena.setSavedFenceBlocks(currentWorldBlocks);
+                VaultWarSavedData.save(level);
+            } else if (!arena.getSavedFenceBlocks().isEmpty()) {
+                // World blocks were air (e.g. game stopped/interrupted during combat) -> restore from persistent saved data
+                for (VaultWarArenaData.SavedFenceBlock savedBlock : arena.getSavedFenceBlocks()) {
+                    originalFenceBlocks.put(savedBlock.pos(), savedBlock.state());
+                }
+                restoreFence();
+            }
         }
 
         if (arena.getArenaMin() != null && arena.getArenaMax() != null) {
@@ -404,28 +455,13 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
 
     public void restoreFence() {
         if (!arena.hasFence()) return;
-        BlockPos min = arena.getFenceMin();
-        BlockPos max = arena.getFenceMax();
-        int minX = Math.min(min.getX(), max.getX());
-        int minY = Math.min(min.getY(), max.getY());
-        int minZ = Math.min(min.getZ(), max.getZ());
-        int maxX = Math.max(min.getX(), max.getX());
-        int maxY = Math.max(min.getY(), max.getY());
-        int maxZ = Math.max(min.getZ(), max.getZ());
-
-        Block defaultBlock = BuiltInRegistries.BLOCK
-                .getOptional(Identifier.tryParse(arena.getFenceBlock()))
-                .orElse(Blocks.IRON_BARS);
-        BlockState fallback = defaultBlock.defaultBlockState();
-
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    BlockPos p = new BlockPos(x, y, z);
-                    BlockState toSet = originalFenceBlocks.getOrDefault(p, fallback);
-                    level.setBlock(p, toSet, 3);
-                }
+        if (originalFenceBlocks.isEmpty() && !arena.getSavedFenceBlocks().isEmpty()) {
+            for (VaultWarArenaData.SavedFenceBlock savedBlock : arena.getSavedFenceBlocks()) {
+                originalFenceBlocks.put(savedBlock.pos(), savedBlock.state());
             }
+        }
+        for (Map.Entry<BlockPos, BlockState> entry : originalFenceBlocks.entrySet()) {
+            level.setBlock(entry.getKey(), entry.getValue(), 3);
         }
     }
 

@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Regression checks against actual Minecraft geometry and the persisted arena codec. */
@@ -238,6 +239,9 @@ public final class MinigameRegressionChecks {
         check(vaultArena.hasFence(), "vault war fence set");
         check(vaultArena.isInsideArena(new BlockPos(15, 62, 15)), "inside vault war arena");
         check(!vaultArena.isInsideArena(new BlockPos(5, 62, 15)), "outside vault war arena");
+        vaultArena.setSavedFenceBlocks(List.of(
+                new de.browars.minigame.vaultwar.VaultWarArenaData.SavedFenceBlock(new BlockPos(20, 61, 10), net.minecraft.world.level.block.Blocks.OAK_FENCE.defaultBlockState())
+        ));
         var vaultEncoded = de.browars.minigame.vaultwar.VaultWarArenaData.CODEC.encodeStart(JsonOps.INSTANCE, vaultArena).getOrThrow();
         var vaultLoaded = de.browars.minigame.vaultwar.VaultWarArenaData.CODEC.parse(JsonOps.INSTANCE, vaultEncoded).getOrThrow();
         check(vaultLoaded.hasArena(), "vault war codec preserves arena");
@@ -246,6 +250,9 @@ public final class MinigameRegressionChecks {
         check(vaultLoaded.getFenceMin().equals(new BlockPos(20, 61, 10)), "vault war codec preserves fence min");
         check(vaultLoaded.getFenceMax().equals(new BlockPos(20, 65, 30)), "vault war codec preserves fence max");
         check("minecraft:iron_bars".equals(vaultLoaded.getFenceBlock()), "vault war codec preserves default fence block");
+        check(vaultLoaded.getSavedFenceBlocks().size() == 1, "vault war codec preserves saved fence blocks size");
+        check(vaultLoaded.getSavedFenceBlocks().get(0).pos().equals(new BlockPos(20, 61, 10)), "vault war codec preserves saved fence block pos");
+        check(vaultLoaded.getSavedFenceBlocks().get(0).state().is(net.minecraft.world.level.block.Blocks.OAK_FENCE), "vault war codec preserves saved fence block state");
 
         System.out.println("All " + checks + " minigame regression checks passed.");
     }

@@ -9,11 +9,21 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class VaultWarArenaData implements DuelArena {
+
+    public record SavedFenceBlock(BlockPos pos, BlockState state) {
+        public static final Codec<SavedFenceBlock> CODEC = RecordCodecBuilder.create(inst -> inst.group(
+                BlockPos.CODEC.fieldOf("pos").forGetter(SavedFenceBlock::pos),
+                BlockState.CODEC.fieldOf("state").forGetter(SavedFenceBlock::state)
+        ).apply(inst, SavedFenceBlock::new));
+    }
 
     public record ArenaSpawn(double x, double y, double z, float yaw, float pitch) {
         public static final Codec<ArenaSpawn> CODEC = RecordCodecBuilder.create(inst -> inst.group(
@@ -36,7 +46,8 @@ public class VaultWarArenaData implements DuelArena {
             Codec.STRING.optionalFieldOf("team2Color", "blue").forGetter(VaultWarArenaData::getTeam2Color),
             BlockPos.CODEC.optionalFieldOf("fenceMin").forGetter(d -> Optional.ofNullable(d.fenceMin)),
             BlockPos.CODEC.optionalFieldOf("fenceMax").forGetter(d -> Optional.ofNullable(d.fenceMax)),
-            Codec.STRING.optionalFieldOf("fenceBlock", "minecraft:iron_bars").forGetter(VaultWarArenaData::getFenceBlock)
+            Codec.STRING.optionalFieldOf("fenceBlock", "minecraft:iron_bars").forGetter(VaultWarArenaData::getFenceBlock),
+            SavedFenceBlock.CODEC.listOf().optionalFieldOf("savedFence", List.of()).forGetter(VaultWarArenaData::getSavedFenceBlocks)
     ).apply(instance, VaultWarArenaData::new));
 
     private BlockPos minPos = BlockPos.ZERO;
@@ -53,6 +64,7 @@ public class VaultWarArenaData implements DuelArena {
     private BlockPos fenceMin = null;
     private BlockPos fenceMax = null;
     private String fenceBlock = "minecraft:iron_bars";
+    private List<SavedFenceBlock> savedFenceBlocks = new ArrayList<>();
 
     public VaultWarArenaData() {}
 
@@ -60,7 +72,7 @@ public class VaultWarArenaData implements DuelArena {
                              Optional<ArenaSpawn> s1, Optional<ArenaSpawn> s2,
                              boolean hasArena, String team1Color, String team2Color,
                              Optional<BlockPos> fenceMin, Optional<BlockPos> fenceMax,
-                             String fenceBlock) {
+                             String fenceBlock, List<SavedFenceBlock> savedFence) {
         this.minPos = minPos;
         this.maxPos = maxPos;
         this.dimension = dimension;
@@ -72,6 +84,7 @@ public class VaultWarArenaData implements DuelArena {
         this.fenceMin = fenceMin.orElse(null);
         this.fenceMax = fenceMax.orElse(null);
         this.fenceBlock = fenceBlock != null && !fenceBlock.isBlank() ? fenceBlock : "minecraft:iron_bars";
+        this.savedFenceBlocks = savedFence != null ? new ArrayList<>(savedFence) : new ArrayList<>();
     }
 
     public void setArenaBounds(BlockPos p1, BlockPos p2, ResourceKey<Level> dim) {
@@ -201,4 +214,12 @@ public class VaultWarArenaData implements DuelArena {
     @Override public TeamColor getTeam2ColorEnum() { return TeamColor.fromString(team2Color, TeamColor.BLUE); }
     @Override public BlockPos getArenaMin() { return minPos; }
     @Override public BlockPos getArenaMax() { return maxPos; }
+
+    public List<SavedFenceBlock> getSavedFenceBlocks() {
+        return savedFenceBlocks;
+    }
+
+    public void setSavedFenceBlocks(List<SavedFenceBlock> savedFenceBlocks) {
+        this.savedFenceBlocks = savedFenceBlocks != null ? new ArrayList<>(savedFenceBlocks) : new ArrayList<>();
+    }
 }
