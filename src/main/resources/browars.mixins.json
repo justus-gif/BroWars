@@ -20,7 +20,9 @@
   "client": [
     "AbstractClientPlayerMixin",
     "MinecraftClientMixin",
-    "AvatarRendererMixin"
+    "AvatarRendererMixin",
+    "LevelRendererMixin",
+    "SubmitNodeCollectionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

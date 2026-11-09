@@ -15,9 +15,6 @@ public class SkyBlockEntity extends BlockEntity {
         if (this.level == null) return true;
         BlockPos neighborPos = this.worldPosition.relative(direction);
         BlockState neighborState = this.level.getBlockState(neighborPos);
-        if (neighborState.is(BroWarsMod.SKY_BLOCK)) {
-            return false;
-        }
-        return !neighborState.isSolidRender();
+        return !neighborState.is(BroWarsMod.SKY_BLOCK);
     }
 }

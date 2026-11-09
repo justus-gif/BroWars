@@ -77,6 +77,21 @@ public class GameshowProtectionManager {
                 return InteractionResult.FAIL;
             }
 
+            if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
+                    && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
+                if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
+                    if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
+                            && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                        lavaEscape.removePlayerPlacedBlock(pos);
+                        serverLevel.destroyBlock(pos, true, serverPlayer);
+                        return InteractionResult.SUCCESS;
+                    }
+                    return InteractionResult.SUCCESS;
+                }
+                sendActionBarWarning(player);
+                return InteractionResult.FAIL;
+            }
+
             if (level.isClientSide() && de.browars.minigame.MinigamePlayerState.isGameItem(player.getMainHandItem())
                     && player.getMainHandItem().has(net.minecraft.core.component.DataComponents.CAN_BREAK)) {
                 return InteractionResult.PASS;
@@ -112,6 +127,16 @@ public class GameshowProtectionManager {
                     && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
                 if (vaultWar.isPlayerPlacedBlock(pos)) {
                     vaultWar.removePlayerPlacedBlock(pos);
+                    return true;
+                }
+                sendActionBarWarning(player);
+                return false;
+            }
+
+            if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
+                    && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
+                if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
+                    lavaEscape.removePlayerPlacedBlock(pos);
                     return true;
                 }
                 sendActionBarWarning(player);
@@ -207,6 +232,47 @@ public class GameshowProtectionManager {
                 }
 
                 // 4. Combat / utility item use (weapons, potions, pearls, wind charges, food, shield)
+                return InteractionResult.PASS;
+            }
+
+            if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
+                    && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
+                BlockState state = level.getBlockState(hitResult.getBlockPos());
+                ItemStack held = player.getItemInHand(hand);
+
+                // 1. Opening chests / barrels in the arena
+                if (state.is(net.minecraft.world.level.block.Blocks.CHEST)
+                        || state.is(net.minecraft.world.level.block.Blocks.BARREL)) {
+                    return InteractionResult.PASS;
+                }
+
+                // 2. Placing blocks (Cobblestone, Scaffolding, Cobwebs, etc.)
+                if (held.getItem() instanceof net.minecraft.world.item.BlockItem) {
+                    BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
+                    if (state.canBeReplaced()) {
+                        placePos = hitResult.getBlockPos();
+                    }
+                    if (lavaEscape.getArena().isInsideArena(placePos)) {
+                        lavaEscape.trackPlacedBlock(placePos);
+                        return InteractionResult.PASS;
+                    }
+                    return InteractionResult.FAIL;
+                }
+
+                // 3. Placing water with bucket
+                if (held.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
+                    BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
+                    if (state.canBeReplaced()) {
+                        placePos = hitResult.getBlockPos();
+                    }
+                    if (lavaEscape.getArena().isInsideArena(placePos)) {
+                        lavaEscape.trackPlacedBlock(placePos);
+                        return InteractionResult.PASS;
+                    }
+                    return InteractionResult.FAIL;
+                }
+
+                // 4. Combat & utility item use (weapons, potions, wind charges, rods, food)
                 return InteractionResult.PASS;
             }
 

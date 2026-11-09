@@ -610,6 +610,7 @@ public class BroWarsMod implements ModInitializer {
             de.browars.command.TargetRushCommand.register(dispatcher);
             de.browars.command.ParkourCommand.register(dispatcher);
             de.browars.command.VaultWarCommand.register(dispatcher);
+            de.browars.command.LavaEscapeCommand.register(dispatcher);
         });
 
         // 10. Check for Updates via GitHub Releases
