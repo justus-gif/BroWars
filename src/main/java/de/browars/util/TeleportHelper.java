@@ -53,6 +53,7 @@ public class TeleportHelper {
 
         if (success) {
             setCooldown(player);
+            de.browars.parkour.ParkourManager.getInstance().cancelRun(player);
 
             // Particle & sound at destination delayed by 3 ticks for client loading
             DELAYED_EFFECTS.add(new DelayedEffect(destLevel, targetX, targetY, targetZ, colorHex, 3));

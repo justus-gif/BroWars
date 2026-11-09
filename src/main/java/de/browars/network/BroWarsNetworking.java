@@ -46,6 +46,7 @@ public final class BroWarsNetworking {
         PayloadTypeRegistry.clientboundPlay().register(de.browars.network.SyncColorFloorDataPayload.TYPE, de.browars.network.SyncColorFloorDataPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncCrossWarPlayerPayload.TYPE, SyncCrossWarPlayerPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncPaintWarRoulettePayload.TYPE, SyncPaintWarRoulettePayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(OpenParkourLeaderboardPayload.TYPE, OpenParkourLeaderboardPayload.CODEC);
 
         // C2S
         PayloadTypeRegistry.serverboundPlay().register(SaveTeleportBlockPayload.TYPE, SaveTeleportBlockPayload.CODEC);
@@ -58,6 +59,7 @@ public final class BroWarsNetworking {
         PayloadTypeRegistry.serverboundPlay().register(SaveUpwardBoosterPayload.TYPE, SaveUpwardBoosterPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(CrossWarShootPayload.TYPE, CrossWarShootPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(CrossWarReloadPayload.TYPE, CrossWarReloadPayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(DeleteParkourScorePayload.TYPE, DeleteParkourScorePayload.CODEC);
 
         // C2S Receivers
         ServerPlayNetworking.registerGlobalReceiver(CrossWarShootPayload.TYPE, (payload, context) -> {
@@ -221,6 +223,26 @@ public final class BroWarsNetworking {
                     }
                 }
             }
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(DeleteParkourScorePayload.TYPE, (payload, context) -> {
+            ServerPlayer player = context.player();
+            if (!PermissionsHelper.isOpOrCreative(player)) return;
+            player.level().getServer().execute(() -> {
+                ServerLevel level = player.level();
+                de.browars.parkour.ParkourSavedData savedData = de.browars.parkour.ParkourSavedData.get(level);
+                if (payload.scoreIndex() < 0) {
+                    savedData.getData().clearScores();
+                    player.sendSystemMessage(Component.literal("§a[Parkour] Alle Bestzeiten gelöscht!"), true);
+                } else {
+                    boolean removed = savedData.getData().deleteScore(payload.scoreIndex());
+                    if (removed) {
+                        player.sendSystemMessage(Component.literal("§a[Parkour] Eintrag erfolgreich gelöscht!"), true);
+                    }
+                }
+                de.browars.parkour.ParkourSavedData.save(level);
+                de.browars.parkour.ParkourManager.getInstance().updateAllHolograms(player.level().getServer());
+            });
         });
     }
 }

@@ -226,6 +226,26 @@ public final class MinigameRegressionChecks {
         var shovelActive = de.browars.minigame.spleef.SpleefGame.createSpleefShovel(null, true);
         check(shovelActive.has(net.minecraft.core.component.DataComponents.CAN_BREAK), "active shovel can break snow");
 
+        var vaultArena = new de.browars.minigame.vaultwar.VaultWarArenaData();
+        check(!vaultArena.hasArena(), "vault war initially has no arena");
+        check(!vaultArena.hasFence(), "vault war initially has no fence");
+        vaultArena.setArenaBounds(new BlockPos(10, 60, 10), new BlockPos(30, 80, 30), Level.OVERWORLD);
+        vaultArena.setSpawn1(12, 61, 15, 90, 0, Level.OVERWORLD);
+        vaultArena.setSpawn2(28, 61, 25, -90, 0, Level.OVERWORLD);
+        vaultArena.setFenceBounds(new BlockPos(20, 61, 10), new BlockPos(20, 65, 30));
+        check(vaultArena.hasArena(), "vault war arena bounds set");
+        check(vaultArena.hasSpawn1() && vaultArena.hasSpawn2(), "vault war spawns set");
+        check(vaultArena.hasFence(), "vault war fence set");
+        check(vaultArena.isInsideArena(new BlockPos(15, 62, 15)), "inside vault war arena");
+        check(!vaultArena.isInsideArena(new BlockPos(5, 62, 15)), "outside vault war arena");
+        var vaultEncoded = de.browars.minigame.vaultwar.VaultWarArenaData.CODEC.encodeStart(JsonOps.INSTANCE, vaultArena).getOrThrow();
+        var vaultLoaded = de.browars.minigame.vaultwar.VaultWarArenaData.CODEC.parse(JsonOps.INSTANCE, vaultEncoded).getOrThrow();
+        check(vaultLoaded.hasArena(), "vault war codec preserves arena");
+        check(vaultLoaded.hasSpawn1() && vaultLoaded.hasSpawn2(), "vault war codec preserves spawns");
+        check(vaultLoaded.hasFence(), "vault war codec preserves fence");
+        check(vaultLoaded.getFenceMin().equals(new BlockPos(20, 61, 10)), "vault war codec preserves fence min");
+        check(vaultLoaded.getFenceMax().equals(new BlockPos(20, 65, 30)), "vault war codec preserves fence max");
+
         System.out.println("All " + checks + " minigame regression checks passed.");
     }
 

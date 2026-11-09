@@ -76,6 +76,12 @@ public class BroWarsClientMod implements ClientModInitializer {
             });
         });
 
+        ClientPlayNetworking.registerGlobalReceiver(de.browars.network.OpenParkourLeaderboardPayload.TYPE, (payload, context) -> {
+            context.client().execute(() -> {
+                Minecraft.getInstance().gui.setScreen(new de.browars.client.gui.ParkourLeaderboardScreen(payload));
+            });
+        });
+
         // Minigame HUD Sync Receiver
         ClientPlayNetworking.registerGlobalReceiver(de.browars.network.SyncMinigameHudPayload.TYPE, (payload, context) -> {
             context.client().execute(() -> {
@@ -167,6 +173,12 @@ public class BroWarsClientMod implements ClientModInitializer {
             // Add the color for tint index 0
             tintValues.add(color);
         }, de.browars.BroWarsMod.BOOST_PAD);
+
+        // Register Sky Block Renderer
+        net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
+                de.browars.BroWarsMod.SKY_BLOCK_ENTITY,
+                de.browars.client.render.SkyBlockRenderer::new
+        );
 
         // 2. Client Selection Box Outline Tick & Cross War Reload Tick
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

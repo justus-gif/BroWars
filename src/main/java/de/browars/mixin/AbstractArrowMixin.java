@@ -45,6 +45,19 @@ public abstract class AbstractArrowMixin {
         }
     }
 
+    @Inject(method = "tick", at = @At("HEAD"))
+    private void browars$targetRushCheckTrajectory(org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci) {
+        AbstractArrow arrow = (AbstractArrow) (Object) this;
+        if (!arrow.isRemoved() && arrow.entityTags().contains("targetrush_arrow") && arrow.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            de.browars.minigame.Minigame active = de.browars.minigame.MinigameManager.getInstance().getActiveGame();
+            if (active instanceof de.browars.minigame.targetrush.TargetRushGame targetRush && targetRush.isRoundActive()) {
+                Vec3 start = arrow.position();
+                Vec3 end = start.add(arrow.getDeltaMovement());
+                targetRush.checkArrowTrajectoryHit(serverLevel, start, end, arrow);
+            }
+        }
+    }
+
     @Inject(method = "canHitEntity", at = @At("HEAD"), cancellable = true)
     private void browars$targetRushIgnorePlayers(Entity entity, CallbackInfoReturnable<Boolean> cir) {
         AbstractArrow arrow = (AbstractArrow) (Object) this;

@@ -24,6 +24,12 @@ public class ModUpdater {
     private static volatile String updateNotification = null;
     private static boolean updateChecked = false;
 
+    private static volatile net.minecraft.server.MinecraftServer currentServer = null;
+
+    public static void setServer(net.minecraft.server.MinecraftServer server) {
+        currentServer = server;
+    }
+
     public static void init() {
         if (updateChecked) return;
         updateChecked = true;
@@ -105,15 +111,22 @@ public class ModUpdater {
                 return;
             }
 
-            // Lokalisieren der aktuellen JAR-Datei
-            Path currentJarPath = null;
-            try {
-                var codeSource = BroWarsMod.class.getProtectionDomain().getCodeSource();
-                if (codeSource != null && codeSource.getLocation() != null) {
-                    currentJarPath = Path.of(codeSource.getLocation().toURI());
+            // Lokalisieren der aktuellen JAR-Datei ueber FabricLoader oder CodeSource
+            Path currentJarPath = FabricLoader.getInstance().getModContainer(BroWarsMod.MOD_ID)
+                    .map(c -> c.getOrigin().getPaths())
+                    .filter(paths -> !paths.isEmpty())
+                    .map(paths -> paths.get(0))
+                    .orElse(null);
+
+            if (currentJarPath == null || !Files.isRegularFile(currentJarPath) || !currentJarPath.toString().endsWith(".jar")) {
+                try {
+                    var codeSource = BroWarsMod.class.getProtectionDomain().getCodeSource();
+                    if (codeSource != null && codeSource.getLocation() != null) {
+                        currentJarPath = Path.of(codeSource.getLocation().toURI());
+                    }
+                } catch (Exception e) {
+                    BroWarsMod.LOGGER.warn("[BroWars Updater] Konnte Pfad der aktuellen JAR nicht ermitteln: {}", e.getMessage());
                 }
-            } catch (Exception e) {
-                BroWarsMod.LOGGER.warn("[BroWars Updater] Konnte Pfad der aktuellen JAR nicht ermitteln: {}", e.getMessage());
             }
 
             if (currentJarPath == null || !Files.isRegularFile(currentJarPath) || !currentJarPath.toString().endsWith(".jar")) {
@@ -154,12 +167,16 @@ public class ModUpdater {
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     try {
                         new ProcessBuilder("cmd", "/c",
-                                "timeout /t 2 /nobreak >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\" & move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\"")
+                                "timeout /t 2 /nobreak >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\" & del /f /q \"" + finalTarget.toAbsolutePath() + "\" & move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\"")
                                 .start();
                     } catch (Exception ignored) {}
                 }));
             } else {
-                Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                try {
+                    Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (Exception ex) {
+                    Files.move(tempFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                }
                 if (!oldJar.equals(targetFile)) {
                     Files.deleteIfExists(oldJar);
                 }
@@ -167,6 +184,14 @@ public class ModUpdater {
 
             updateNotification = "§a[BroWars] Update auf v" + remoteVersion + " wurde automatisch heruntergeladen! Beim naechsten Spielstart ist es aktiv.";
             BroWarsMod.LOGGER.info("[BroWars Updater] Update v{} erfolgreich heruntergeladen!", remoteVersion);
+
+            if (currentServer != null) {
+                currentServer.execute(() -> {
+                    for (ServerPlayer player : currentServer.getPlayerList().getPlayers()) {
+                        player.sendSystemMessage(Component.literal(updateNotification));
+                    }
+                });
+            }
 
         } catch (Exception e) {
             BroWarsMod.LOGGER.warn("[BroWars Updater] Fehler beim Pruefen auf Updates: {}", e.getMessage());

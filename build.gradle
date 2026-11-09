@@ -84,14 +84,35 @@ ext.deployJarFiles = { File jarFile ->
     }
     copy {
         from jarFile
+        into parentBuildsDir
+        rename { "BroWars.jar" }
+    }
+    copy {
+        from jarFile
+        into file("${projectDir}/build")
+        rename { "BroWars.jar" }
+    }
+    copy {
+        from jarFile
+        into file("${projectDir}/build/libs")
+        rename { "BroWars.jar" }
+    }
+    copy {
+        from jarFile
         into localBuildsDir
         rename { "browars-latest.jar" }
     }
 
-    // Automatischer Deploy in den Minecraft-Mod-Ordner (falls konfiguriert)
+    // Automatischer Deploy in das BroWars-Profil und konfigurierte Mod-Ordner
+    def deployDirs = [
+        file("${System.getProperty('user.home')}/.local/share/noriskclientv3/profiles/BroWars/mods")
+    ]
     def deployTarget = project.findProperty('deploy_mods_dir') ?: System.getenv('MINECRAFT_MODS_DIR')
     if (deployTarget) {
-        def deployDir = file(deployTarget.toString().replace("~", System.getProperty("user.home")))
+        deployDirs.add(file(deployTarget.toString().replace("~", System.getProperty("user.home"))))
+    }
+
+    deployDirs.each { deployDir ->
         if (deployDir.exists() && deployDir.isDirectory()) {
             deployDir.listFiles().each { file ->
                 if (file.name.startsWith("browars") && file.name.endsWith(".jar")) {
@@ -102,7 +123,7 @@ ext.deployJarFiles = { File jarFile ->
                 from jarFile
                 into deployDir
             }
-            println "[BroWars] Mod automatisch aktualisiert in Mod-Ordner: ${deployDir.absolutePath}/${jarFile.name}"
+            println "[BroWars] Mod automatisch aktualisiert in Profil-Mod-Ordner: ${deployDir.absolutePath}/${jarFile.name}"
         }
     }
 

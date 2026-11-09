@@ -53,6 +53,30 @@ public class HologramHelper {
         ((de.browars.mixin.DisplayAccess) display).browars$setBillboard(Display.BillboardConstraints.CENTER);
     }
 
+    public static UUID createTargetBadge(ServerLevel level, double x, double y, double z, Component text, int bgColor) {
+        Display.TextDisplay display = net.minecraft.world.entity.EntityTypes.TEXT_DISPLAY.create(level, EntitySpawnReason.TRIGGERED);
+        if (display != null) {
+            display.setPos(x, y, z);
+            ((de.browars.mixin.TextDisplayAccess) display).browars$setText(text);
+            ((de.browars.mixin.TextDisplayAccess) display).browars$setBackgroundColor(bgColor);
+            ((de.browars.mixin.TextDisplayAccess) display).browars$setFlags((byte) 1);
+            ((de.browars.mixin.DisplayAccess) display).browars$setBillboard(Display.BillboardConstraints.CENTER);
+            ((de.browars.mixin.DisplayAccess) display).browars$setViewRange(4.0f);
+            ((de.browars.mixin.DisplayAccess) display).browars$setTransformation(
+                    new com.mojang.math.Transformation(
+                            new org.joml.Vector3f(),
+                            new org.joml.Quaternionf(),
+                            new org.joml.Vector3f(1.25f, 1.25f, 1.25f),
+                            new org.joml.Quaternionf()
+                    )
+            );
+            display.addTag("browars_target_badge");
+            level.addFreshEntity(display);
+            return display.getUUID();
+        }
+        return null;
+    }
+
     public static void removeHologram(ServerLevel level, UUID uuid) {
         if (uuid == null) return;
         Entity entity = level.getEntity(uuid);

@@ -90,7 +90,13 @@ public class MinigameHudElement implements HudElement {
             extractor.fill(cLeft, top, cRight, top + 1, 0x88FFAA00);
             extractor.fill(cLeft, cBottom - 1, cRight, cBottom, 0x88FFAA00);
 
-            extractor.centeredText(font, "§6§l" + state.gameTitle() + " §7• " + state.currentRound(), centerX, top + 4, 0xFFFFD700);
+            String centerTitleText;
+            if ("targetrush".equals(state.gameId())) {
+                centerTitleText = state.p2Name().isEmpty() ? "§6§lTarget Rush §7• §eSolo" : "§6§lTarget Rush §7• §eDuell";
+            } else {
+                centerTitleText = "§6§l" + state.gameTitle() + " §7• " + state.currentRound();
+            }
+            extractor.centeredText(font, centerTitleText, centerX, top + 4, 0xFFFFD700);
             extractor.centeredText(font, fullSub, centerX, top + 15, 0xFFCBD5E1);
 
             // 3. PLAYER 2 CARD (Right) - only if 2 players

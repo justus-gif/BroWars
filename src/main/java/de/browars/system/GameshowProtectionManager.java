@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 
 import java.util.Map;
@@ -61,6 +62,21 @@ public class GameshowProtectionManager {
                 return InteractionResult.FAIL;
             }
 
+            if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
+                    && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
+                if (vaultWar.isPlayerPlacedBlock(pos)) {
+                    if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
+                            && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                        vaultWar.removePlayerPlacedBlock(pos);
+                        serverLevel.destroyBlock(pos, true, serverPlayer);
+                        return InteractionResult.SUCCESS;
+                    }
+                    return InteractionResult.SUCCESS;
+                }
+                sendActionBarWarning(player);
+                return InteractionResult.FAIL;
+            }
+
             if (level.isClientSide() && de.browars.minigame.MinigamePlayerState.isGameItem(player.getMainHandItem())
                     && player.getMainHandItem().has(net.minecraft.core.component.DataComponents.CAN_BREAK)) {
                 return InteractionResult.PASS;
@@ -92,6 +108,16 @@ public class GameshowProtectionManager {
                 return false;
             }
 
+            if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
+                    && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
+                if (vaultWar.isPlayerPlacedBlock(pos)) {
+                    vaultWar.removePlayerPlacedBlock(pos);
+                    return true;
+                }
+                sendActionBarWarning(player);
+                return false;
+            }
+
             if (!protectionEnabled) return true;
 
             if (de.browars.util.PermissionsHelper.isOpOrCreative(player)) {
@@ -115,13 +141,85 @@ public class GameshowProtectionManager {
                 return InteractionResult.FAIL;
             }
 
+            if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
+                    && vaultWar.isRunning() && vaultWar.isPlayerParticipating(player.getUUID())) {
+                BlockState state = level.getBlockState(hitResult.getBlockPos());
+                ItemStack held = player.getItemInHand(hand);
+
+                // 1. Vault interaction with keys
+                if (state.is(net.minecraft.world.level.block.Blocks.VAULT)) {
+                    BlockPos vaultPos = hitResult.getBlockPos();
+                    boolean isTrialKey = held.is(net.minecraft.world.item.Items.TRIAL_KEY);
+                    boolean isOminousKey = held.is(net.minecraft.world.item.Items.OMINOUS_TRIAL_KEY);
+
+                    if (isTrialKey || isOminousKey) {
+                        if (vaultWar.isVaultOnCooldown(vaultPos)) {
+                            if (!level.isClientSide() && player instanceof ServerPlayer sPlayer) {
+                                int ticksLeft = vaultWar.getVaultCooldownTicks(vaultPos);
+                                sPlayer.sendSystemMessage(Component.literal("§7[Vault War] Vault lädt noch nach... (" + String.format(java.util.Locale.ROOT, "%.1fs", ticksLeft / 20.0f) + ")"), true);
+                                level.playSound(null, vaultPos, net.minecraft.sounds.SoundEvents.VAULT_INSERT_ITEM_FAIL, net.minecraft.sounds.SoundSource.BLOCKS, 0.8f, 1.2f);
+                            }
+                            return InteractionResult.SUCCESS;
+                        }
+
+                        if (!level.isClientSide() && player instanceof ServerPlayer sPlayer) {
+                            held.shrink(1);
+                            vaultWar.onUseKey(sPlayer, vaultPos, isOminousKey);
+                        }
+                        return InteractionResult.SUCCESS;
+                    } else if (held.getItem() instanceof net.minecraft.world.item.BlockItem) {
+                        BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
+                        if (vaultWar.getArena().isInsideArena(placePos)) {
+                            vaultWar.trackPlacedBlock(placePos);
+                            return InteractionResult.PASS;
+                        }
+                        return InteractionResult.FAIL;
+                    } else {
+                        if (!level.isClientSide() && player instanceof ServerPlayer sPlayer) {
+                            sPlayer.sendSystemMessage(Component.literal("§e[Vault War] §7Rechtsklick mit einem §fTrial Key §7oder §5Ominous Key§7!"), true);
+                            level.playSound(null, vaultPos, net.minecraft.sounds.SoundEvents.VAULT_INSERT_ITEM_FAIL, net.minecraft.sounds.SoundSource.BLOCKS, 1.0f, 1.0f);
+                        }
+                        return InteractionResult.SUCCESS;
+                    }
+                }
+
+                // 2. Station blocks (Anvils, Crafting Table, Grindstone, Smithing Table)
+                if (state.is(net.minecraft.world.level.block.Blocks.ANVIL)
+                        || state.is(net.minecraft.world.level.block.Blocks.CHIPPED_ANVIL)
+                        || state.is(net.minecraft.world.level.block.Blocks.DAMAGED_ANVIL)
+                        || state.is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE)
+                        || state.is(net.minecraft.world.level.block.Blocks.GRINDSTONE)
+                        || state.is(net.minecraft.world.level.block.Blocks.SMITHING_TABLE)) {
+                    return InteractionResult.PASS;
+                }
+
+                // 3. Placing utility blocks (e.g. Cobwebs)
+                if (held.getItem() instanceof net.minecraft.world.item.BlockItem) {
+                    BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
+                    if (state.canBeReplaced()) {
+                        placePos = hitResult.getBlockPos();
+                    }
+                    if (vaultWar.getArena().isInsideArena(placePos)) {
+                        vaultWar.trackPlacedBlock(placePos);
+                        return InteractionResult.PASS;
+                    }
+                    return InteractionResult.FAIL;
+                }
+
+                // 4. Combat / utility item use (weapons, potions, pearls, wind charges, food, shield)
+                return InteractionResult.PASS;
+            }
+
             if (!protectionEnabled) return InteractionResult.PASS;
 
             if (de.browars.util.PermissionsHelper.isOpOrCreative(player)) {
                 return InteractionResult.PASS;
             }
 
-            if (player.getItemInHand(hand).is(de.browars.BroWarsMod.CROSSWAR_CROSSBOW)) {
+            ItemStack held = player.getItemInHand(hand);
+            if (held.is(de.browars.BroWarsMod.CROSSWAR_CROSSBOW)
+                    || held.is(net.minecraft.world.item.Items.BOW)
+                    || held.is(net.minecraft.world.item.Items.CROSSBOW)) {
                 return InteractionResult.PASS;
             }
 

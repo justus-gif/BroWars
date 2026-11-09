@@ -15,6 +15,9 @@ public class SlotMixin {
 
     @Inject(method = "mayPickup", at = @At("HEAD"), cancellable = true)
     private void browars$preventGameItemRemoval(Player player, CallbackInfoReturnable<Boolean> cir) {
+        if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame) {
+            return;
+        }
         Slot self = (Slot) (Object) this;
         ItemStack stack = self.getItem();
         if (!stack.isEmpty()) {
@@ -26,6 +29,9 @@ public class SlotMixin {
 
     @Inject(method = "mayPlace", at = @At("HEAD"), cancellable = true)
     private void browars$lockMinigameSlots(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
+        if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame) {
+            return;
+        }
         Slot self = (Slot) (Object) this;
         ItemStack current = self.getItem();
         if (!current.isEmpty() && MinigamePlayerState.isGameItem(current)) {

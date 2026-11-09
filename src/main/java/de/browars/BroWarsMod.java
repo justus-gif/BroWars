@@ -141,6 +141,18 @@ public class BroWarsMod implements ModInitializer {
     public static final ResourceKey<Item> MEGA_STRIKE_KEY = ResourceKey.create(
             Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID, "mega_strike")
     );
+    public static final ResourceKey<Block> PARKOUR_LEADERBOARD_KEY = ResourceKey.create(
+            Registries.BLOCK, Identifier.fromNamespaceAndPath(MOD_ID, "parkour_leaderboard")
+    );
+    public static final ResourceKey<Item> PARKOUR_LEADERBOARD_ITEM_KEY = ResourceKey.create(
+            Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID, "parkour_leaderboard")
+    );
+    public static final ResourceKey<Block> SKY_BLOCK_KEY = ResourceKey.create(
+            Registries.BLOCK, Identifier.fromNamespaceAndPath(MOD_ID, "sky_block")
+    );
+    public static final ResourceKey<Item> SKY_BLOCK_ITEM_KEY = ResourceKey.create(
+            Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID, "sky_block")
+    );
     public static final ResourceKey<CreativeModeTab> BROWARS_TAB_KEY = ResourceKey.create(
             Registries.CREATIVE_MODE_TAB, Identifier.fromNamespaceAndPath(MOD_ID, "browars_tab")
     );
@@ -209,7 +221,34 @@ public class BroWarsMod implements ModInitializer {
                     .setId(PAINT_LUCKY_BOX_KEY)
     );
 
+    public static final de.browars.block.ParkourLeaderboardBlock PARKOUR_LEADERBOARD = new de.browars.block.ParkourLeaderboardBlock(
+            BlockBehaviour.Properties.of()
+                    .noCollision()
+                    .noOcclusion()
+                    .setId(PARKOUR_LEADERBOARD_KEY)
+    );
+
+    public static final de.browars.block.SkyBlock SKY_BLOCK = new de.browars.block.SkyBlock(
+            BlockBehaviour.Properties.of()
+                    .noOcclusion()
+                    .lightLevel(s -> 15)
+                    .destroyTime(1.5f)
+                    .explosionResistance(6.0f)
+                    .sound(net.minecraft.world.level.block.SoundType.GLASS)
+                    .setId(SKY_BLOCK_KEY)
+    );
+
     // Items
+    public static final BlockItem PARKOUR_LEADERBOARD_ITEM = new BlockItem(
+            PARKOUR_LEADERBOARD,
+            new Item.Properties().useBlockDescriptionPrefix().setId(PARKOUR_LEADERBOARD_ITEM_KEY)
+    );
+
+    public static final BlockItem SKY_BLOCK_ITEM = new BlockItem(
+            SKY_BLOCK,
+            new Item.Properties().useBlockDescriptionPrefix().setId(SKY_BLOCK_ITEM_KEY)
+    );
+
     public static final BlockItem TELEPORT_BLOCK_ITEM = new BlockItem(
             TELEPORT_BLOCK,
             new Item.Properties().useBlockDescriptionPrefix().setId(TELEPORT_BLOCK_ITEM_KEY)
@@ -291,6 +330,8 @@ public class BroWarsMod implements ModInitializer {
     public static BlockEntityType<de.browars.block.entity.TeleportTargetBlockEntity> TELEPORT_TARGET_BLOCK_ENTITY;
     public static BlockEntityType<de.browars.block.entity.TextBlockEntity> TEXT_BLOCK_ENTITY;
     public static BlockEntityType<de.browars.block.entity.UpwardBoosterBlockEntity> UPWARD_BOOSTER_BLOCK_ENTITY;
+    public static BlockEntityType<de.browars.block.entity.ParkourLeaderboardBlockEntity> PARKOUR_LEADERBOARD_BLOCK_ENTITY;
+    public static BlockEntityType<de.browars.block.entity.SkyBlockEntity> SKY_BLOCK_ENTITY;
 
     @Override
     public void onInitialize() {
@@ -308,8 +349,12 @@ public class BroWarsMod implements ModInitializer {
         Registry.register(BuiltInRegistries.BLOCK, TEAM_COUNTDOWN_CONCRETE_KEY, TEAM_COUNTDOWN_CONCRETE);
         Registry.register(BuiltInRegistries.BLOCK, NET_BLOCK_KEY, NET_BLOCK);
         Registry.register(BuiltInRegistries.BLOCK, PAINT_LUCKY_BOX_KEY, PAINT_LUCKY_BOX);
+        Registry.register(BuiltInRegistries.BLOCK, PARKOUR_LEADERBOARD_KEY, PARKOUR_LEADERBOARD);
+        Registry.register(BuiltInRegistries.BLOCK, SKY_BLOCK_KEY, SKY_BLOCK);
 
         // 2. Register Items
+        Registry.register(BuiltInRegistries.ITEM, PARKOUR_LEADERBOARD_ITEM_KEY, PARKOUR_LEADERBOARD_ITEM);
+        Registry.register(BuiltInRegistries.ITEM, SKY_BLOCK_ITEM_KEY, SKY_BLOCK_ITEM);
         Registry.register(BuiltInRegistries.ITEM, TELEPORT_BLOCK_ITEM_KEY, TELEPORT_BLOCK_ITEM);
         Registry.register(BuiltInRegistries.ITEM, TELEPORT_WAND_KEY, TELEPORT_WAND);
         Registry.register(BuiltInRegistries.ITEM, ARENA_WAND_KEY, ARENA_WAND);
@@ -363,12 +408,26 @@ public class BroWarsMod implements ModInitializer {
                 FabricBlockEntityTypeBuilder.create(de.browars.block.entity.UpwardBoosterBlockEntity::new, UPWARD_BOOSTER).build()
         );
 
+        PARKOUR_LEADERBOARD_BLOCK_ENTITY = Registry.register(
+                BuiltInRegistries.BLOCK_ENTITY_TYPE,
+                Identifier.fromNamespaceAndPath(MOD_ID, "parkour_leaderboard"),
+                FabricBlockEntityTypeBuilder.create(de.browars.block.entity.ParkourLeaderboardBlockEntity::new, PARKOUR_LEADERBOARD).build()
+        );
+
+        SKY_BLOCK_ENTITY = Registry.register(
+                BuiltInRegistries.BLOCK_ENTITY_TYPE,
+                Identifier.fromNamespaceAndPath(MOD_ID, "sky_block"),
+                FabricBlockEntityTypeBuilder.create(de.browars.block.entity.SkyBlockEntity::new, SKY_BLOCK).build()
+        );
+
         // 4. Register Creative Mode Tab
         CreativeModeTab tab = FabricCreativeModeTab.builder()
                 .title(Component.translatable("itemGroup.browars"))
                 .icon(() -> new ItemStack(TELEPORT_WAND))
                 .displayItems((params, output) -> {
                     output.accept(TELEPORT_BLOCK_ITEM);
+                    output.accept(PARKOUR_LEADERBOARD_ITEM);
+                    output.accept(SKY_BLOCK_ITEM);
                     output.accept(TELEPORT_WAND);
                     output.accept(ARENA_WAND);
                     output.accept(ORANGE_SLIME_BLOCK_ITEM);
@@ -400,6 +459,7 @@ public class BroWarsMod implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(EnvironmentLockManager::onServerTick);
         ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.util.TeleportHelper.onServerTick());
         ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.minigame.MinigameManager.getInstance().onServerTick(server));
+        ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.parkour.ParkourManager.getInstance().onServerTick(server));
         ServerLifecycleEvents.SERVER_STARTED.register(EnvironmentLockManager::applyEnvironmentLock);
 
         // Wand interaction handler (must run before general protection)
@@ -455,10 +515,12 @@ public class BroWarsMod implements ModInitializer {
                 GameshowProtectionManager.clearPlayer(handler.player.getUUID());
             }
         });
+        ServerLifecycleEvents.SERVER_STARTED.register(de.browars.updater.ModUpdater::setServer);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
             de.browars.minigame.MinigameManager.getInstance().stopCurrentMinigame("Server wird beendet");
             de.browars.util.TeleportHelper.resetRuntimeState();
         });
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> de.browars.updater.ModUpdater.setServer(null));
 
         // 7. Register Gameshow Survival Protection
         GameshowProtectionManager.register();
@@ -486,6 +548,15 @@ public class BroWarsMod implements ModInitializer {
                         tntTag.onPlayerAttack(sAttacker, sVictim);
                     }
                     return net.minecraft.world.InteractionResult.SUCCESS;
+                }
+                if (active instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
+                        && vaultWar.isRunning()
+                        && vaultWar.isPlayerParticipating(player.getUUID())
+                        && vaultWar.isPlayerParticipating(targetPlayer.getUUID())) {
+                    if (vaultWar.isCombatActive()) {
+                        return net.minecraft.world.InteractionResult.PASS;
+                    }
+                    return net.minecraft.world.InteractionResult.FAIL;
                 }
                 return net.minecraft.world.InteractionResult.FAIL;
             }
@@ -537,6 +608,8 @@ public class BroWarsMod implements ModInitializer {
             de.browars.command.PaintWarCommand.register(dispatcher);
             de.browars.command.SpleefCommand.register(dispatcher);
             de.browars.command.TargetRushCommand.register(dispatcher);
+            de.browars.command.ParkourCommand.register(dispatcher);
+            de.browars.command.VaultWarCommand.register(dispatcher);
         });
 
         // 10. Check for Updates via GitHub Releases

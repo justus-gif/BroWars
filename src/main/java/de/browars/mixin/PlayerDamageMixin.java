@@ -51,6 +51,15 @@ public class PlayerDamageMixin {
             return;
         }
 
+        if (active instanceof de.browars.minigame.vaultwar.VaultWarGame vaultWar
+                && vaultWar.isRunning() && vaultWar.isPlayerParticipating(victim.getUUID())) {
+            if (!vaultWar.isCombatActive()) {
+                cir.setReturnValue(false);
+                return;
+            }
+            return;
+        }
+
         if (active instanceof de.browars.minigame.AbstractDuelGame<?> game
                 && game.isRunning() && game.isPlayerParticipating(victim.getUUID())) {
             cir.setReturnValue(false);
