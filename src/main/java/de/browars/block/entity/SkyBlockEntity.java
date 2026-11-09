@@ -5,42 +5,56 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.shapes.Shapes;
 
 public class SkyBlockEntity extends BlockEntity {
     private static final Direction[] DIRECTIONS = Direction.values();
-    // Bitmask: Bit 0 = DOWN, 1 = UP, 2 = NORTH, 3 = SOUTH, 4 = WEST, 5 = EAST
-    // -1 = dirty / not computed
-    private byte cachedVisibleFaces = -1;
+    private final BlockPos.MutableBlockPos scratchPos = new BlockPos.MutableBlockPos();
+    private byte lastComputedMask = 0x3F;
 
     public SkyBlockEntity(BlockPos pos, BlockState state) {
         super(BroWarsMod.SKY_BLOCK_ENTITY, pos, state);
     }
 
-    public void clearFaceCache() {
-        this.cachedVisibleFaces = -1;
+    public byte getLastVisibleMask() {
+        return this.lastComputedMask;
     }
 
-    public byte getVisibleFaces() {
-        if (this.cachedVisibleFaces == -1) {
-            updateVisibleFaces();
-        }
-        return this.cachedVisibleFaces;
+    public void setLastVisibleMask(byte mask) {
+        this.lastComputedMask = mask;
     }
 
-    private void updateVisibleFaces() {
+    /**
+     * Dynamically computes the visible faces of this SkyBlock for the current frame.
+     * Evaluated on demand each frame so changes (placed/broken blocks, chunk loads)
+     * are reflected immediately with zero stale cache bugs.
+     */
+    public byte computeVisibleFaces() {
         if (this.level == null) {
-            this.cachedVisibleFaces = 0x3F; // All 6 faces visible by default
-            return;
+            return 0x3F;
         }
         byte mask = 0;
-        BlockPos.MutableBlockPos mut = new BlockPos.MutableBlockPos();
+        BlockPos pos = this.worldPosition;
         for (int i = 0; i < 6; i++) {
-            mut.setWithOffset(this.worldPosition, DIRECTIONS[i]);
-            BlockState neighbor = this.level.getBlockState(mut);
-            if (!neighbor.is(BroWarsMod.SKY_BLOCK)) {
-                mask |= (byte) (1 << i);
+            Direction dir = DIRECTIONS[i];
+            this.scratchPos.set(pos.getX() + dir.getStepX(), pos.getY() + dir.getStepY(), pos.getZ() + dir.getStepZ());
+            BlockState neighbor = this.level.getBlockState(this.scratchPos);
+
+            // 1. Skip internal faces between adjacent SkyBlocks so multi-block structures connect seamlessly
+            if (neighbor.is(BroWarsMod.SKY_BLOCK)) {
+                continue;
             }
+
+            // 2. Skip faces touching solid full blocks that completely occlude this face
+            // This prevents Z-fighting and flickering seams with adjacent terrain
+            if (neighbor.getFaceOcclusionShape(dir.getOpposite()) == Shapes.block()) {
+                continue;
+            }
+
+            mask |= (byte) (1 << i);
         }
-        this.cachedVisibleFaces = mask;
+        this.lastComputedMask = mask;
+        return mask;
     }
 }
+

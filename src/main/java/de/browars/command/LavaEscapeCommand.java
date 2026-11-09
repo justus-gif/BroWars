@@ -48,6 +48,7 @@ public class LavaEscapeCommand {
                                         .suggests(teamColorSuggestion)
                                         .executes(ctx -> executeSetTeamColor(ctx, 2)))))
                 .then(Commands.literal("targetscore")
+                        .executes(LavaEscapeCommand::executeShowTargetScore)
                         .then(Commands.argument("punkte", IntegerArgumentType.integer(1, 10))
                                 .executes(LavaEscapeCommand::executeSetTargetScore)))
                 .then(Commands.literal("start")
@@ -197,6 +198,15 @@ public class LavaEscapeCommand {
 
         player.sendSystemMessage(Component.literal("§a[Lava Escape] Team " + teamNumber + " Standardfarbe auf "
                 + color.chatPrefix + color.displayName + " §agesetzt!"), false);
+        return 1;
+    }
+
+    private static int executeShowTargetScore(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        LavaEscapeSavedData saved = LavaEscapeSavedData.get(player.level());
+        int score = saved.getData().getTargetScore();
+        player.sendSystemMessage(Component.literal("§6[Lava Escape] Aktuelle Ziel-Punkteanzahl: §e" + score + " §7(First to " + score + ")"), false);
+        player.sendSystemMessage(Component.literal("§7Ändern mit: §e/browars lavaescape targetscore <1-10>"), false);
         return 1;
     }
 

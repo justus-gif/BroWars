@@ -15,7 +15,9 @@
     "AbstractArrowMixin",
     "DisplayAccess",
     "BlockDisplayAccess",
-    "TextDisplayAccess"
+    "TextDisplayAccess",
+    "ServerPlayerMixin",
+    "ThrownEnderpearlMixin"
   ],
   "client": [
     "AbstractClientPlayerMixin",

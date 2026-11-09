@@ -44,42 +44,5 @@ public class SkyBlock extends BaseEntityBlock {
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new SkyBlockEntity(pos, state);
     }
-
-    @Override
-    protected BlockState updateShape(
-            BlockState state,
-            LevelReader level,
-            ScheduledTickAccess ticks,
-            BlockPos pos,
-            Direction direction,
-            BlockPos neighborPos,
-            BlockState neighborState,
-            RandomSource random
-    ) {
-        if (level instanceof Level clientLevel && clientLevel.isClientSide()) {
-            BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof SkyBlockEntity skyEntity) {
-                skyEntity.clearFaceCache();
-            }
-        }
-        return super.updateShape(state, level, ticks, pos, direction, neighborPos, neighborState, random);
-    }
-
-    @Override
-    protected void neighborChanged(
-            BlockState state,
-            Level level,
-            BlockPos pos,
-            Block neighborBlock,
-            @Nullable Orientation orientation,
-            boolean movedByPiston
-    ) {
-        super.neighborChanged(state, level, pos, neighborBlock, orientation, movedByPiston);
-        if (level.isClientSide()) {
-            BlockEntity be = level.getBlockEntity(pos);
-            if (be instanceof SkyBlockEntity skyEntity) {
-                skyEntity.clearFaceCache();
-            }
-        }
-    }
 }
+

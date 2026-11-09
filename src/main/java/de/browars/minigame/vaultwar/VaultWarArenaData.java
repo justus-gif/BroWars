@@ -35,7 +35,8 @@ public class VaultWarArenaData implements DuelArena {
             Codec.STRING.optionalFieldOf("team1Color", "red").forGetter(VaultWarArenaData::getTeam1Color),
             Codec.STRING.optionalFieldOf("team2Color", "blue").forGetter(VaultWarArenaData::getTeam2Color),
             BlockPos.CODEC.optionalFieldOf("fenceMin").forGetter(d -> Optional.ofNullable(d.fenceMin)),
-            BlockPos.CODEC.optionalFieldOf("fenceMax").forGetter(d -> Optional.ofNullable(d.fenceMax))
+            BlockPos.CODEC.optionalFieldOf("fenceMax").forGetter(d -> Optional.ofNullable(d.fenceMax)),
+            Codec.STRING.optionalFieldOf("fenceBlock", "minecraft:iron_bars").forGetter(VaultWarArenaData::getFenceBlock)
     ).apply(instance, VaultWarArenaData::new));
 
     private BlockPos minPos = BlockPos.ZERO;
@@ -51,13 +52,15 @@ public class VaultWarArenaData implements DuelArena {
 
     private BlockPos fenceMin = null;
     private BlockPos fenceMax = null;
+    private String fenceBlock = "minecraft:iron_bars";
 
     public VaultWarArenaData() {}
 
     public VaultWarArenaData(BlockPos minPos, BlockPos maxPos, ResourceKey<Level> dimension,
                              Optional<ArenaSpawn> s1, Optional<ArenaSpawn> s2,
                              boolean hasArena, String team1Color, String team2Color,
-                             Optional<BlockPos> fenceMin, Optional<BlockPos> fenceMax) {
+                             Optional<BlockPos> fenceMin, Optional<BlockPos> fenceMax,
+                             String fenceBlock) {
         this.minPos = minPos;
         this.maxPos = maxPos;
         this.dimension = dimension;
@@ -68,6 +71,7 @@ public class VaultWarArenaData implements DuelArena {
         this.team2Color = team2Color != null ? team2Color : "blue";
         this.fenceMin = fenceMin.orElse(null);
         this.fenceMax = fenceMax.orElse(null);
+        this.fenceBlock = fenceBlock != null && !fenceBlock.isBlank() ? fenceBlock : "minecraft:iron_bars";
     }
 
     public void setArenaBounds(BlockPos p1, BlockPos p2, ResourceKey<Level> dim) {
@@ -122,6 +126,14 @@ public class VaultWarArenaData implements DuelArena {
 
     public BlockPos getFenceMax() {
         return fenceMax;
+    }
+
+    public String getFenceBlock() {
+        return fenceBlock != null && !fenceBlock.isBlank() ? fenceBlock : "minecraft:iron_bars";
+    }
+
+    public void setFenceBlock(String fenceBlock) {
+        this.fenceBlock = fenceBlock != null && !fenceBlock.isBlank() ? fenceBlock : "minecraft:iron_bars";
     }
 
     public boolean isInsideArena(BlockPos pos) {

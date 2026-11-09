@@ -5,7 +5,9 @@ import de.browars.minigame.MinigameManager;
 import de.browars.minigame.TeamColor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -222,7 +224,8 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
 
         message("§eDie 60-sekündige Loot-Phase hat begonnen! Öffne Vaults & nutze den Amboss!");
         setCenterTitle("§6§lLOOT-PHASE!", "60 Sekunden Zeit!", 0xFFF59E0B, 40);
-        playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.2f);
+        playSound(SoundEvents.NOTE_BLOCK_BELL, 1.0f);
+        playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8f);
     }
 
     private void setupPlayerForLooting(ServerPlayer player) {
@@ -277,8 +280,8 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         removeFence();
 
         setCenterTitle("§c§lKAMPF!", "Der Zaun ist gefallen – besiege deinen Gegner!", 0xFFEF4444, 50);
-        playSound(SoundEvents.RAID_HORN.value(), 1.0f);
-        playSound(SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, 1.0f);
+        playSound(SoundEvents.NOTE_BLOCK_PLING, 2.0f);
+        playSound(SoundEvents.IRON_DOOR_OPEN, 1.0f);
         message("§c§lKAMPF! §eDer Zaun ist gefallen! PvP ist jetzt aktiviert!");
         MinigameManager.getInstance().broadcastHud(server, getHudState());
     }
@@ -286,7 +289,7 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
     private void startSuddenDeath() {
         vaultPhase = VaultPhase.SUDDEN_DEATH;
         setCenterTitle("§4§lSUDDEN DEATH!", "Zeit abgelaufen (-1 ❤ alle 2s)", 0xFFDC2626, 60);
-        playSound(SoundEvents.WITHER_SPAWN, 1.5f);
+        playSound(SoundEvents.NOTE_BLOCK_BASS, 0.8f);
         message("§4§l[Vault War] SUDDEN DEATH! Zeitlimit erreicht!");
         MinigameManager.getInstance().broadcastHud(server, getHudState());
     }
@@ -297,6 +300,11 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
             if (player == null || player.isDeadOrDying() || player.level() != level) continue;
             player.addEffect(new MobEffectInstance(MobEffects.GLOWING, 30, 0, false, false, false));
             if (combatTicks % 40 == 0) {
+                if (player.getHealth() <= 2.0f) {
+                    player.setHealth(player.getMaxHealth());
+                    finishRoundByElimination(player.getUUID(), "Sudden Death!");
+                    return;
+                }
                 player.hurtServer(level, level.damageSources().wither(), 2.0f);
             }
         }
@@ -340,21 +348,25 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
             int maxY = Math.max(min.getY(), max.getY());
             int maxZ = Math.max(min.getZ(), max.getZ());
 
+            Block defaultBlock = BuiltInRegistries.BLOCK
+                    .getOptional(Identifier.tryParse(arena.getFenceBlock()))
+                    .orElse(Blocks.IRON_BARS);
+            BlockState fallbackFence = defaultBlock.defaultBlockState();
+
             for (int x = minX; x <= maxX; x++) {
                 for (int y = minY; y <= maxY; y++) {
                     for (int z = minZ; z <= maxZ; z++) {
                         BlockPos p = new BlockPos(x, y, z);
                         BlockState st = level.getBlockState(p);
-                        if (!originalFenceBlocks.containsKey(p)) {
-                            if (!st.isAir()) {
-                                originalFenceBlocks.put(p, st);
-                            }
+                        if (!st.isAir()) {
+                            originalFenceBlocks.put(p, st);
                         } else {
-                            level.setBlock(p, originalFenceBlocks.get(p), 3);
+                            originalFenceBlocks.putIfAbsent(p, fallbackFence);
                         }
                     }
                 }
             }
+            restoreFence();
         }
 
         if (arena.getArenaMin() != null && arena.getArenaMax() != null) {
@@ -390,9 +402,49 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         }
     }
 
-    private void restoreFence() {
-        for (Map.Entry<BlockPos, BlockState> entry : originalFenceBlocks.entrySet()) {
-            level.setBlock(entry.getKey(), entry.getValue(), 3);
+    public void restoreFence() {
+        if (!arena.hasFence()) return;
+        BlockPos min = arena.getFenceMin();
+        BlockPos max = arena.getFenceMax();
+        int minX = Math.min(min.getX(), max.getX());
+        int minY = Math.min(min.getY(), max.getY());
+        int minZ = Math.min(min.getZ(), max.getZ());
+        int maxX = Math.max(min.getX(), max.getX());
+        int maxY = Math.max(min.getY(), max.getY());
+        int maxZ = Math.max(min.getZ(), max.getZ());
+
+        Block defaultBlock = BuiltInRegistries.BLOCK
+                .getOptional(Identifier.tryParse(arena.getFenceBlock()))
+                .orElse(Blocks.IRON_BARS);
+        BlockState fallback = defaultBlock.defaultBlockState();
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    BlockPos p = new BlockPos(x, y, z);
+                    BlockState toSet = originalFenceBlocks.getOrDefault(p, fallback);
+                    level.setBlock(p, toSet, 3);
+                }
+            }
+        }
+    }
+
+    public boolean isPositionOnPlayerSide(double x, double z, int spawnNumber) {
+        if (!arena.hasFence()) return true;
+        BlockPos min = arena.getFenceMin();
+        BlockPos max = arena.getFenceMax();
+        var spawn = arena.spawn(spawnNumber);
+        if (spawn == null) return true;
+
+        int dx = max.getX() - min.getX();
+        int dz = max.getZ() - min.getZ();
+
+        if (dx <= dz) {
+            double fenceX = (min.getX() + max.getX() + 1) / 2.0;
+            return (spawn.x() < fenceX) == (x < fenceX);
+        } else {
+            double fenceZ = (min.getZ() + max.getZ() + 1) / 2.0;
+            return (spawn.z() < fenceZ) == (z < fenceZ);
         }
     }
 

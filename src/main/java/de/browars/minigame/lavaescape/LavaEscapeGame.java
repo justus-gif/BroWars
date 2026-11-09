@@ -154,11 +154,20 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         currentLavaLayer = arena.getMinPos().getY() - 1;
         currentSpeed = MIN_SPEED;
 
+        ServerPlayer p1 = server.getPlayerList().getPlayer(p1Uuid);
+        if (p1 != null) p1.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        if (p2Uuid != null) {
+            ServerPlayer p2 = server.getPlayerList().getPlayer(p2Uuid);
+            if (p2 != null) p2.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        }
+
         message("§6[Lava Escape] Die Schonfrist läuft! In §e5 Sekunden §6beginnt die Lava zu steigen!");
     }
 
     @Override
     protected void equipExtra(ServerPlayer player) {
+        player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+
         ItemStack sword = new ItemStack(Items.STONE_SWORD);
         MinigamePlayerState.markGameItem(sword);
         player.getInventory().setItem(0, sword);
@@ -314,32 +323,65 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         BlockPos min = arena.getEffectiveChestMin();
         BlockPos max = arena.getEffectiveChestMax();
 
-        int height = max.getY() - min.getY();
-        int desiredChests = Math.max(3, Math.min(20, height / 4));
+        int minX = Math.min(min.getX(), max.getX());
+        int maxX = Math.max(min.getX(), max.getX());
+        int minY = Math.min(min.getY(), max.getY());
+        int maxY = Math.max(min.getY(), max.getY());
+        int minZ = Math.min(min.getZ(), max.getZ());
+        int maxZ = Math.max(min.getZ(), max.getZ());
 
-        List<BlockPos> validPlatforms = new ArrayList<>();
+        RandomSource random = level.getRandom();
         BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
 
-        int marginX = min.getX() + 1;
-        int limitX = max.getX() - 1;
-        int marginZ = min.getZ() + 1;
-        int limitZ = max.getZ() - 1;
+        // 1. First: Check for any pre-placed chests/barrels in the arena/chest-area
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    mpos.set(x, y, z);
+                    BlockState state = level.getBlockState(mpos);
+                    if (state.is(Blocks.CHEST) || state.is(Blocks.BARREL)) {
+                        BlockPos imm = mpos.immutable();
+                        chestPositions.add(imm);
+                        populateChest(imm, random);
+                    }
+                }
+            }
+        }
 
-        for (int y = min.getY(); y <= max.getY() - 2; y++) {
-            for (int x = marginX; x <= limitX; x++) {
-                for (int z = marginZ; z <= limitZ; z++) {
+        int height = maxY - minY + 1;
+        int desiredChests = Math.max(3, Math.min(20, height / 4));
+
+        // If pre-placed chests already satisfy the count, we don't need to generate more
+        if (chestPositions.size() >= desiredChests) {
+            de.browars.BroWarsMod.LOGGER.info("[Lava Escape] {} vorplatzierte Kisten gefunden und befüllt.", chestPositions.size());
+            return;
+        }
+
+        // 2. Procedural chest platform finder
+        // If not using a separate chestarea, stay 1 block inside outer walls if arena is wide enough
+        int startX = (arena.hasChestArea() || maxX - minX <= 3) ? minX : minX + 1;
+        int endX = (arena.hasChestArea() || maxX - minX <= 3) ? maxX : maxX - 1;
+        int startZ = (arena.hasChestArea() || maxZ - minZ <= 3) ? minZ : minZ + 1;
+        int endZ = (arena.hasChestArea() || maxZ - minZ <= 3) ? maxZ : maxZ - 1;
+
+        List<BlockPos> validPlatforms = new ArrayList<>();
+
+        for (int y = minY; y <= maxY - 1; y++) {
+            for (int x = startX; x <= endX; x++) {
+                for (int z = startZ; z <= endZ; z++) {
                     mpos.set(x, y, z);
                     BlockState floor = level.getBlockState(mpos);
-                    if (!floor.isSolid()) continue;
+                    if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER)) continue;
+                    if (floor.getCollisionShape(level, mpos).isEmpty()) continue;
 
                     BlockPos chestPos = mpos.above();
-                    BlockPos aboveChest = chestPos.above();
+                    if (chestPositions.contains(chestPos)) continue;
 
-                    if (!level.getBlockState(chestPos).isAir()) continue;
-                    if (!level.getBlockState(aboveChest).isAir()) continue;
+                    BlockState chestSpace = level.getBlockState(chestPos);
+                    if (!chestSpace.isAir() && !chestSpace.canBeReplaced()) continue;
                     if (arena.isInsideGoal(chestPos)) continue;
 
-                    // Avoid spawning directly on top of spawns
+                    // Avoid spawning directly on top of player spawns
                     if (isNearSpawn(chestPos, 1) || isNearSpawn(chestPos, 2)) continue;
 
                     validPlatforms.add(chestPos.immutable());
@@ -347,14 +389,17 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
             }
         }
 
-        if (validPlatforms.isEmpty()) return;
+        if (validPlatforms.isEmpty()) {
+            de.browars.BroWarsMod.LOGGER.warn("[Lava Escape] Keine Plattformen für Kistengenerierung gefunden im Bereich {} bis {}", min.toShortString(), max.toShortString());
+            return;
+        }
 
         // Distribute chests vertically
-        Collections.shuffle(validPlatforms, new java.util.Random(level.getRandom().nextLong()));
+        Collections.shuffle(validPlatforms, new java.util.Random(random.nextLong()));
         validPlatforms.sort(Comparator.comparingInt(BlockPos::getY));
 
-        int step = Math.max(1, validPlatforms.size() / desiredChests);
-        RandomSource random = level.getRandom();
+        int needed = desiredChests - chestPositions.size();
+        int step = Math.max(1, validPlatforms.size() / Math.max(1, needed));
 
         for (int i = 0; i < validPlatforms.size() && chestPositions.size() < desiredChests; i += step) {
             BlockPos cPos = validPlatforms.get(i);
@@ -362,18 +407,23 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
             level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
             chestPositions.add(cPos);
+            populateChest(cPos, random);
+        }
 
-            BlockEntity be = level.getBlockEntity(cPos);
-            if (be instanceof ChestBlockEntity chest) {
-                List<ItemStack> loot = LavaEscapeLoot.generateChestLoot(level.registryAccess(), random);
-                // Distribute items into random slots
-                List<Integer> slots = new ArrayList<>();
-                for (int s = 0; s < 27; s++) slots.add(s);
-                Collections.shuffle(slots, new java.util.Random(random.nextLong()));
+        de.browars.BroWarsMod.LOGGER.info("[Lava Escape] Insgesamt {} Kisten bereitgestellt.", chestPositions.size());
+    }
 
-                for (int idx = 0; idx < loot.size() && idx < slots.size(); idx++) {
-                    chest.setItem(slots.get(idx), loot.get(idx));
-                }
+    private void populateChest(BlockPos pos, RandomSource random) {
+        BlockEntity be = level.getBlockEntity(pos);
+        if (be instanceof ChestBlockEntity chest) {
+            chest.clearContent();
+            List<ItemStack> loot = LavaEscapeLoot.generateChestLoot(level.registryAccess(), random);
+            List<Integer> slots = new ArrayList<>();
+            for (int s = 0; s < chest.getContainerSize(); s++) slots.add(s);
+            Collections.shuffle(slots, new java.util.Random(random.nextLong()));
+
+            for (int idx = 0; idx < loot.size() && idx < slots.size(); idx++) {
+                chest.setItem(slots.get(idx), loot.get(idx));
             }
         }
     }

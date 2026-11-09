@@ -245,6 +245,7 @@ public final class MinigameRegressionChecks {
         check(vaultLoaded.hasFence(), "vault war codec preserves fence");
         check(vaultLoaded.getFenceMin().equals(new BlockPos(20, 61, 10)), "vault war codec preserves fence min");
         check(vaultLoaded.getFenceMax().equals(new BlockPos(20, 65, 30)), "vault war codec preserves fence max");
+        check("minecraft:iron_bars".equals(vaultLoaded.getFenceBlock()), "vault war codec preserves default fence block");
 
         System.out.println("All " + checks + " minigame regression checks passed.");
     }

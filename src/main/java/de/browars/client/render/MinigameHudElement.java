@@ -253,8 +253,8 @@ public class MinigameHudElement implements HudElement {
         // 5. CENTER LARGE TITLE & ANIMATIONS
         if (state.centerTitleTicks() > 0 && !state.centerTitle().isEmpty()) {
             String title = state.centerTitle();
-            boolean isNumber = title.length() <= 2 && Character.isDigit(title.charAt(0));
-            boolean isShort = title.length() <= 5;
+            String stripped = title.replaceAll("§[0-9a-fk-or]", "").trim();
+            boolean isNumber = stripped.length() <= 2 && !stripped.isEmpty() && Character.isDigit(stripped.charAt(0));
 
             float centerY = screenHeight / 2.0f;
             int titleColor = 0xFF000000 | (state.centerTitleColorHex() & 0x00FFFFFF);
@@ -262,7 +262,7 @@ public class MinigameHudElement implements HudElement {
                 titleColor = 0xFFFFFFFF;
             }
 
-            if (isNumber || isShort) {
+            if (isNumber) {
                 // Subtle translucent glass circle plate behind countdown (NOT solid black)
                 int plateW = 70;
                 int plateH = 50;
@@ -274,7 +274,7 @@ public class MinigameHudElement implements HudElement {
                 extractor.fill(px1, py1, px2, py2, 0x55000000); // 33% translucent glass
                 extractor.fill(px1, py1, px2, py1 + 2, titleColor); // vibrant top accent line
 
-                float scale = isNumber ? 3.5f : 2.5f;
+                float scale = 3.5f;
                 extractor.pose().pushMatrix();
                 extractor.pose().translate(centerX, centerY);
                 extractor.pose().scale(scale, scale);
@@ -286,9 +286,14 @@ public class MinigameHudElement implements HudElement {
                     extractor.centeredText(font, state.centerSubtitle(), centerX, py2 + 8, 0xFFFFFFFF);
                 }
             } else {
-                // Wide sleek banner for announcements
-                int bannerW = Math.min(screenWidth - 16, Math.max(260, (int) (font.width(title) * 1.5f) + 30));
-                int bannerH = 42;
+                // Wide sleek banner for announcements & game start
+                String sub = state.centerSubtitle();
+                boolean hasSub = !sub.isEmpty();
+                int titleW = (int) (font.width(title) * 1.5f);
+                int subW = hasSub ? font.width(sub) : 0;
+                int contentW = Math.max(titleW, subW);
+                int bannerW = Math.min(screenWidth - 16, Math.max(260, contentW + 40));
+                int bannerH = hasSub ? 56 : 40;
                 int bx1 = centerX - bannerW / 2;
                 int bx2 = centerX + bannerW / 2;
                 int by1 = (int) (centerY - bannerH / 2f);
@@ -298,16 +303,20 @@ public class MinigameHudElement implements HudElement {
                 extractor.fill(bx1, by1, bx2, by1 + 2, titleColor);
                 extractor.fill(bx1, by2 - 2, bx2, by2, titleColor);
 
-                float scale = Math.min(1.5f, (screenWidth - 32f) / Math.max(1, font.width(title)));
+                float scale = Math.min(1.5f, (screenWidth - 48f) / Math.max(1, font.width(title)));
                 extractor.pose().pushMatrix();
-                extractor.pose().translate(centerX, centerY - 5);
+                if (hasSub) {
+                    extractor.pose().translate(centerX, centerY - 9);
+                } else {
+                    extractor.pose().translate(centerX, centerY);
+                }
                 extractor.pose().scale(scale, scale);
                 int strW = font.width(title);
                 extractor.text(font, title, -strW / 2, -4, titleColor, true);
                 extractor.pose().popMatrix();
 
-                if (!state.centerSubtitle().isEmpty()) {
-                    extractor.centeredText(font, state.centerSubtitle(), centerX, (int) centerY + 10, 0xFFE2E8F0);
+                if (hasSub) {
+                    extractor.centeredText(font, sub, centerX, (int) centerY + 12, 0xFFE2E8F0);
                 }
             }
         }

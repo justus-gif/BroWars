@@ -137,7 +137,6 @@ public class VaultWarCommand {
 
         VaultWarSavedData saved = VaultWarSavedData.get(player.level());
         saved.getData().setFenceBounds(p1, p2);
-        VaultWarSavedData.save(player.level());
 
         BlockPos min = saved.getData().getFenceMin();
         BlockPos max = saved.getData().getFenceMax();
@@ -145,9 +144,47 @@ public class VaultWarCommand {
         int height = max.getY() - min.getY() + 1;
         int depth = max.getZ() - min.getZ() + 1;
 
+        ServerLevel level = (ServerLevel) player.level();
+        String detectedBlock = null;
+        boolean allAir = true;
+
+        for (int x = min.getX(); x <= max.getX() && detectedBlock == null; x++) {
+            for (int y = min.getY(); y <= max.getY() && detectedBlock == null; y++) {
+                for (int z = min.getZ(); z <= max.getZ() && detectedBlock == null; z++) {
+                    net.minecraft.world.level.block.state.BlockState st = level.getBlockState(new BlockPos(x, y, z));
+                    if (!st.isAir()) {
+                        allAir = false;
+                        detectedBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(st.getBlock()).toString();
+                    }
+                }
+            }
+        }
+
+        if (detectedBlock != null) {
+            saved.getData().setFenceBlock(detectedBlock);
+        } else {
+            saved.getData().setFenceBlock("minecraft:iron_bars");
+        }
+
+        if (allAir) {
+            var defaultBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                    .getOptional(net.minecraft.resources.Identifier.tryParse(saved.getData().getFenceBlock()))
+                    .orElse(net.minecraft.world.level.block.Blocks.IRON_BARS);
+            net.minecraft.world.level.block.state.BlockState placeState = defaultBlock.defaultBlockState();
+            for (int x = min.getX(); x <= max.getX(); x++) {
+                for (int y = min.getY(); y <= max.getY(); y++) {
+                    for (int z = min.getZ(); z <= max.getZ(); z++) {
+                        level.setBlock(new BlockPos(x, y, z), placeState, 3);
+                    }
+                }
+            }
+        }
+
+        VaultWarSavedData.save(player.level());
+
         player.sendSystemMessage(Component.literal("§a[Vault War] Trennzaun erfolgreich festgelegt: "
                 + min.toShortString() + " bis " + max.toShortString()
-                + " §7(" + width + "×" + height + "×" + depth + ")"), false);
+                + " §7(" + width + "×" + height + "×" + depth + ", " + saved.getData().getFenceBlock() + ")"), false);
         return 1;
     }
 

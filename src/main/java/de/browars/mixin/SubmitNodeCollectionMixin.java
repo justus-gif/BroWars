@@ -20,7 +20,8 @@ public class SubmitNodeCollectionMixin {
             SubmitNodeCollector.CustomGeometryRenderer renderer,
             CallbackInfo ci
     ) {
-        if (renderType == RenderTypes.waterMask()) {
+        if (renderType == RenderTypes.waterMask()
+                || (renderType != null && renderType.toString().contains("water_mask"))) {
             ((SubmitNodeCollection) (Object) this).waterMask.submit(
                     new CustomFeatureRenderer.Submit(poseStack.last().copy(), renderType, renderer)
             );

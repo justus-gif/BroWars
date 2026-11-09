@@ -14,7 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.Vec3;
 
 public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, SkyBlockRenderState> {
-    private static final double MAX_RENDER_DISTANCE = 256.0;
+    private static final double MAX_RENDER_DISTANCE = 1024.0;
     private static final double MAX_RENDER_DISTANCE_SQ = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
 
     public SkyBlockRenderer(BlockEntityRendererProvider.Context context) {
@@ -27,17 +27,19 @@ public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, Sky
 
     @Override
     public boolean shouldRender(SkyBlockEntity blockEntity, Vec3 cameraPos) {
-        // 1. Cull immediately if all 6 neighbor faces are covered by other SkyBlocks
-        if (blockEntity.getVisibleFaces() == 0) {
-            return false;
-        }
-
-        // 2. High-performance allocation-free squared distance check
+        // 1. High-performance allocation-free squared distance check (up to 1024m)
         BlockPos pos = blockEntity.getBlockPos();
         double dx = (pos.getX() + 0.5) - cameraPos.x;
         double dy = (pos.getY() + 0.5) - cameraPos.y;
         double dz = (pos.getZ() + 0.5) - cameraPos.z;
-        return (dx * dx + dy * dy + dz * dz) <= MAX_RENDER_DISTANCE_SQ;
+        if ((dx * dx + dy * dy + dz * dz) > MAX_RENDER_DISTANCE_SQ) {
+            return false;
+        }
+
+        // 2. Cull immediately if all 6 neighbor faces are covered
+        // Evaluated fresh every frame: zero stale cache, zero missing faces
+        byte mask = blockEntity.computeVisibleFaces();
+        return mask != 0;
     }
 
     @Override
@@ -48,7 +50,7 @@ public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, Sky
     @Override
     public void extractRenderState(SkyBlockEntity entity, SkyBlockRenderState state, float partialTick, Vec3 cameraPos, ModelFeatureRenderer.CrumblingOverlay overlay) {
         BlockEntityRenderState.extractBase(entity, state, overlay);
-        state.visibleFacesMask = entity.getVisibleFaces();
+        state.visibleFacesMask = entity.getLastVisibleMask();
     }
 
     @Override

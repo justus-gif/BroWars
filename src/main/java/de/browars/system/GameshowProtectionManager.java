@@ -80,13 +80,7 @@ public class GameshowProtectionManager {
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
                     && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
                 if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
-                    if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer
-                            && level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                        lavaEscape.removePlayerPlacedBlock(pos);
-                        serverLevel.destroyBlock(pos, true, serverPlayer);
-                        return InteractionResult.SUCCESS;
-                    }
-                    return InteractionResult.SUCCESS;
+                    return InteractionResult.PASS;
                 }
                 sendActionBarWarning(player);
                 return InteractionResult.FAIL;
@@ -253,20 +247,20 @@ public class GameshowProtectionManager {
                         placePos = hitResult.getBlockPos();
                     }
                     if (lavaEscape.getArena().isInsideArena(placePos)) {
-                        lavaEscape.trackPlacedBlock(placePos);
+                        if (!level.isClientSide()) lavaEscape.trackPlacedBlock(placePos);
                         return InteractionResult.PASS;
                     }
                     return InteractionResult.FAIL;
                 }
 
-                // 3. Placing water with bucket
-                if (held.is(net.minecraft.world.item.Items.WATER_BUCKET)) {
+                // 3. Placing water or picking up water with bucket
+                if (held.is(net.minecraft.world.item.Items.WATER_BUCKET) || held.is(net.minecraft.world.item.Items.BUCKET)) {
                     BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
                     if (state.canBeReplaced()) {
                         placePos = hitResult.getBlockPos();
                     }
                     if (lavaEscape.getArena().isInsideArena(placePos)) {
-                        lavaEscape.trackPlacedBlock(placePos);
+                        if (!level.isClientSide()) lavaEscape.trackPlacedBlock(placePos);
                         return InteractionResult.PASS;
                     }
                     return InteractionResult.FAIL;

@@ -6,7 +6,11 @@ import de.browars.minigame.MinigameManager;
 import de.browars.minigame.crosswar.CrossWarGame;
 import de.browars.minigame.sumo.SumoGame;
 import de.browars.system.WorldSpawnRespawnHandler;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -36,6 +40,35 @@ public class LivingEntityMixin {
     }
 
     /**
+     * Catches lethal damage before health reaches 0, preventing the Minecraft death screen.
+     */
+    @Inject(method = "setHealth", at = @At("HEAD"), cancellable = true)
+    private void browars$preventZeroHealth(float health, CallbackInfo ci) {
+        LivingEntity entity = (LivingEntity) (Object) this;
+        if (entity instanceof ServerPlayer player && health <= 0.05f) {
+            ci.cancel();
+            player.setHealth(player.getMaxHealth());
+            player.clearFire();
+            player.removeAllEffects();
+            player.setDeltaMovement(0, 0, 0);
+            player.fallDistance = 0;
+
+            if (player.level() instanceof ServerLevel serverLevel) {
+                serverLevel.sendParticles(ParticleTypes.POOF, player.getX(), player.getY() + 1.0, player.getZ(), 20, 0.4, 0.5, 0.4, 0.05);
+                serverLevel.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1.0f, 0.8f);
+            }
+
+            Minigame active = MinigameManager.getInstance().getActiveGame();
+            if (active instanceof AbstractDuelGame<?> duel && duel.isRoundActive() && duel.isPlayerParticipating(player.getUUID())) {
+                duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+                return;
+            }
+
+            WorldSpawnRespawnHandler.teleportToWorldSpawn(player);
+        }
+    }
+
+    /**
      * Prevents any player from actually dying (no death screen, no inventory drop).
      * If lethal damage occurs in a minigame, the round resolves cleanly.
      * Outside minigames, the player is safely recovered to world spawn.
@@ -51,9 +84,14 @@ public class LivingEntityMixin {
             player.setDeltaMovement(0, 0, 0);
             player.fallDistance = 0;
 
+            if (player.level() instanceof ServerLevel serverLevel) {
+                serverLevel.sendParticles(ParticleTypes.POOF, player.getX(), player.getY() + 1.0, player.getZ(), 20, 0.4, 0.5, 0.4, 0.05);
+                serverLevel.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1.0f, 0.8f);
+            }
+
             Minigame active = MinigameManager.getInstance().getActiveGame();
             if (active instanceof AbstractDuelGame<?> duel && duel.isRoundActive() && duel.isPlayerParticipating(player.getUUID())) {
-                duel.finishRoundByElimination(player.getUUID(), "Ausgeschieden");
+                duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
                 return;
             }
 
