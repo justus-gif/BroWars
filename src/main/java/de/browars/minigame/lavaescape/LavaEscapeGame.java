@@ -157,6 +157,23 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         return playerPlacedBlocks.contains(pos);
     }
 
+    public boolean canBreakBlock(BlockPos pos) {
+        if (playerPlacedBlocks.contains(pos) || chestPositions.contains(pos)) {
+            return true;
+        }
+        BlockState base = arenaSnapshot.get(pos);
+        return base != null && !level.getBlockState(pos).equals(base);
+    }
+
+    public boolean isInsideBuildZone(BlockPos pos) {
+        if (!arena.hasArena()) return false;
+        BlockPos min = arena.getMinPos();
+        BlockPos max = arena.getMaxPos();
+        return pos.getX() >= min.getX() - 1 && pos.getX() <= max.getX() + 1
+                && pos.getY() >= min.getY() - 1 && pos.getY() <= max.getY() + 3
+                && pos.getZ() >= min.getZ() - 1 && pos.getZ() <= max.getZ() + 1;
+    }
+
     public void removePlayerPlacedBlock(BlockPos pos) {
         playerPlacedBlocks.remove(pos);
     }
@@ -428,11 +445,8 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         RandomSource random = level.getRandom();
         BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
 
-        int lowestFloorY = findLowestFloorY(level, minX, maxX, minY, maxY, minZ, maxZ);
-        int maxAllowedChestY = Math.min(maxY, lowestFloorY + 2);
-
-        // 1. First: Check for any pre-placed chests/barrels at the bottom floor of the arena/chest-area
-        for (int y = minY; y <= maxAllowedChestY; y++) {
+        // 1. First: Check for any pre-placed chests/barrels anywhere in the chest area
+        for (int y = minY; y <= maxY; y++) {
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     mpos.set(x, y, z);
@@ -449,22 +463,21 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         int area = Math.max(1, (maxX - minX + 1) * (maxZ - minZ + 1));
         int desiredChests = Math.max(6, Math.min(24, area / 16));
 
-        // If pre-placed chests already satisfy the count, we don't need to generate more
         if (chestPositions.size() >= desiredChests) {
-            de.browars.BroWarsMod.LOGGER.info("[Lava Escape] {} vorplatzierte Kisten am Boden gefunden und befüllt.", chestPositions.size());
+            de.browars.BroWarsMod.LOGGER.info("[Lava Escape] {} vorplatzierte Kisten gefunden und befüllt.", chestPositions.size());
             return;
         }
 
-        // 2. Collect valid ground platforms (strictly on the bottom floor, never on upper parkour platforms)
-        List<BlockPos> validPlatforms = collectValidGroundPlatforms(level, minX, maxX, minY, maxY, minZ, maxZ, true);
+        // 2. Collect valid platforms randomly across ALL heights (minY..maxY)
+        List<BlockPos> validPlatforms = collectValidChestPlatforms(level, minX, maxX, minY, maxY, minZ, maxZ, true);
 
         if (validPlatforms.isEmpty()) {
-            de.browars.BroWarsMod.LOGGER.warn("[Lava Escape] Keine Boden-Plattformen für Kistengenerierung gefunden im Bereich {} bis {}", min.toShortString(), max.toShortString());
+            de.browars.BroWarsMod.LOGGER.warn("[Lava Escape] Keine Plattformen für Kistengenerierung gefunden im Bereich {} bis {}", min.toShortString(), max.toShortString());
             return;
         }
 
         int needed = desiredChests - chestPositions.size();
-        List<BlockPos> chosen = selectDistributedGroundChests(validPlatforms, chestPositions, needed, random);
+        List<BlockPos> chosen = selectDistributedChests(validPlatforms, chestPositions, needed, random);
         for (BlockPos cPos : chosen) {
             arenaSnapshot.putIfAbsent(cPos, level.getBlockState(cPos));
             level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
@@ -472,7 +485,7 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
             populateChestStatic(level, cPos, random);
         }
 
-        de.browars.BroWarsMod.LOGGER.info("[Lava Escape] Insgesamt {} Kisten am Boden (Y={}) bereitgestellt.", chestPositions.size(), lowestFloorY + 1);
+        de.browars.BroWarsMod.LOGGER.info("[Lava Escape] Insgesamt {} zufällige Kisten in der Arena bereitgestellt.", chestPositions.size());
     }
 
     public static int generateAndPlaceChests(ServerLevel level, BlockPos p1, BlockPos p2) {
@@ -503,19 +516,16 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         int area = Math.max(1, (maxX - minX + 1) * (maxZ - minZ + 1));
         int desiredChests = Math.max(6, Math.min(24, area / 16));
 
-        int lowestFloorY = findLowestFloorY(level, minX, maxX, minY, maxY, minZ, maxZ);
-        int groundMaxY = Math.min(maxY, lowestFloorY + 1);
-
         List<BlockPos> validPlatforms = new ArrayList<>();
         BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+        int searchMaxY = Math.max(minY, maxY - 1);
 
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                for (int y = lowestFloorY; y <= groundMaxY; y++) {
+        for (int y = minY; y <= searchMaxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
                     mpos.set(x, y, z);
-                    if (isValidGroundChestSpot(level, mpos)) {
+                    if (isValidChestSpot(level, mpos)) {
                         validPlatforms.add(mpos.above().immutable());
-                        break;
                     }
                 }
             }
@@ -523,7 +533,7 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
         if (validPlatforms.isEmpty()) return 0;
 
-        List<BlockPos> chosen = selectDistributedGroundChests(validPlatforms, Set.of(), desiredChests, random);
+        List<BlockPos> chosen = selectDistributedChests(validPlatforms, Set.of(), desiredChests, random);
         int placed = 0;
         for (BlockPos cPos : chosen) {
             level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
@@ -534,32 +544,11 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         return placed;
     }
 
-    private static int findLowestFloorY(ServerLevel level, int startX, int endX, int minY, int maxY, int startZ, int endZ) {
-        BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
-        int searchLimitY = Math.min(maxY, minY + 12);
-        for (int y = minY; y <= searchLimitY; y++) {
-            int validSpotsOnLayer = 0;
-            for (int x = startX; x <= endX; x++) {
-                for (int z = startZ; z <= endZ; z++) {
-                    mpos.set(x, y, z);
-                    if (isValidGroundChestSpot(level, mpos)) {
-                        validSpotsOnLayer++;
-                        if (validSpotsOnLayer >= 3) {
-                            return y;
-                        }
-                    }
-                }
-            }
-            if (validSpotsOnLayer > 0) {
-                return y;
-            }
-        }
-        return minY;
-    }
-
-    private static boolean isValidGroundChestSpot(ServerLevel level, BlockPos floorPos) {
+    private static boolean isValidChestSpot(ServerLevel level, BlockPos floorPos) {
         BlockState floor = level.getBlockState(floorPos);
-        if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER) || floor.is(Blocks.CHEST) || floor.is(Blocks.BARREL)) {
+        if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER)
+                || floor.is(Blocks.CHEST) || floor.is(Blocks.BARREL)
+                || floor.is(Blocks.SCAFFOLDING) || floor.is(Blocks.COBWEB)) {
             return false;
         }
         if (!floor.isSolid() && floor.getCollisionShape(level, floorPos).isEmpty()) {
@@ -568,7 +557,10 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
         BlockPos chestPos = floorPos.above();
         BlockState chestSpace = level.getBlockState(chestPos);
-        if (!chestSpace.isAir() && !chestSpace.canBeReplaced() && !chestSpace.is(Blocks.CHEST)) {
+        if (chestSpace.is(Blocks.LAVA) || chestSpace.is(Blocks.WATER) || chestSpace.is(Blocks.CHEST)) {
+            return false;
+        }
+        if (!chestSpace.isAir() && !chestSpace.canBeReplaced()) {
             return false;
         }
 
@@ -583,31 +575,29 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         return true;
     }
 
-    private List<BlockPos> collectValidGroundPlatforms(ServerLevel level, int startX, int endX, int minY, int maxY, int startZ, int endZ, boolean checkSpawns) {
+    private List<BlockPos> collectValidChestPlatforms(ServerLevel level, int startX, int endX, int minY, int maxY, int startZ, int endZ, boolean checkSpawns) {
         List<BlockPos> validPlatforms = new ArrayList<>();
         BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
-        int lowestFloorY = findLowestFloorY(level, startX, endX, minY, maxY, startZ, endZ);
-        int groundMaxY = Math.min(maxY, lowestFloorY + 1);
+        int searchMaxY = Math.max(minY, maxY - 1);
 
-        for (int x = startX; x <= endX; x++) {
-            for (int z = startZ; z <= endZ; z++) {
-                for (int y = lowestFloorY; y <= groundMaxY; y++) {
+        for (int y = minY; y <= searchMaxY; y++) {
+            for (int x = startX; x <= endX; x++) {
+                for (int z = startZ; z <= endZ; z++) {
                     mpos.set(x, y, z);
-                    if (!isValidGroundChestSpot(level, mpos)) continue;
+                    if (!isValidChestSpot(level, mpos)) continue;
 
                     BlockPos chestPos = mpos.above();
-                    if (chestPositions.contains(chestPos)) break;
+                    if (chestPositions.contains(chestPos)) continue;
                     if (checkSpawns && (isNearSpawn(chestPos, 1) || isNearSpawn(chestPos, 2))) continue;
 
                     validPlatforms.add(chestPos.immutable());
-                    break;
                 }
             }
         }
         return validPlatforms;
     }
 
-    private static List<BlockPos> selectDistributedGroundChests(List<BlockPos> candidates, Set<BlockPos> existing, int count, RandomSource random) {
+    private static List<BlockPos> selectDistributedChests(List<BlockPos> candidates, Set<BlockPos> existing, int count, RandomSource random) {
         if (candidates.isEmpty() || count <= 0) return List.of();
 
         List<BlockPos> pool = new ArrayList<>(candidates);
@@ -616,16 +606,16 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         List<BlockPos> selected = new ArrayList<>();
         List<BlockPos> allOccupied = new ArrayList<>(existing);
 
-        // Pass 1: Strict ground spacing (at least 3.5 blocks apart = 12.25 distSqr)
+        // Pass 1: Wide 3D spacing (at least 4.0 blocks apart = 16.0 distSqr)
         for (BlockPos p : pool) {
             if (selected.size() >= count) break;
-            if (isFarEnough(p, allOccupied, 12.25)) {
+            if (isFarEnough(p, allOccupied, 16.0)) {
                 selected.add(p);
                 allOccupied.add(p);
             }
         }
 
-        // Pass 2: Medium ground spacing (at least 2.5 blocks apart = 6.25 distSqr) if more needed
+        // Pass 2: Medium 3D spacing (at least 2.5 blocks apart = 6.25 distSqr) if more needed
         if (selected.size() < count) {
             for (BlockPos p : pool) {
                 if (selected.size() >= count) break;
@@ -637,7 +627,7 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
             }
         }
 
-        // Pass 3: Close ground spacing (at least 1.5 blocks apart = 2.25 distSqr) if still needed
+        // Pass 3: Close 3D spacing (at least 1.5 blocks apart = 2.25 distSqr) if still needed
         if (selected.size() < count) {
             for (BlockPos p : pool) {
                 if (selected.size() >= count) break;

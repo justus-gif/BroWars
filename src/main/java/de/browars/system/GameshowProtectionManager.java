@@ -83,7 +83,7 @@ public class GameshowProtectionManager {
 
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
                     && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
-                if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
+                if (lavaEscape.canBreakBlock(pos)) {
                     if (!lavaEscape.isRoundActive()) {
                         return InteractionResult.FAIL;
                     }
@@ -152,7 +152,7 @@ public class GameshowProtectionManager {
 
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
                     && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
-                if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
+                if (lavaEscape.canBreakBlock(pos)) {
                     if (!lavaEscape.isRoundActive()) {
                         return false;
                     }
@@ -313,8 +313,8 @@ public class GameshowProtectionManager {
                     if (state.canBeReplaced()) {
                         placePos = clickedPos;
                     }
-                    // Allow placing if either placePos or clickedPos (e.g. stacking scaffolding/vines) is inside the arena
-                    if (lavaEscape.getArena().isInsideArena(placePos) || lavaEscape.getArena().isInsideArena(clickedPos)) {
+                    // Allow placing inside the arena build zone (including edges/top margin)
+                    if (lavaEscape.isInsideBuildZone(placePos) || lavaEscape.isInsideBuildZone(clickedPos)) {
                         lavaEscape.trackPlacedBlock(placePos);
                         if (!placePos.equals(clickedPos)) {
                             lavaEscape.trackPlacedBlock(clickedPos);
@@ -326,6 +326,9 @@ public class GameshowProtectionManager {
 
                 // 3. Placing water or picking up water with bucket
                 if (held.is(net.minecraft.world.item.Items.WATER_BUCKET) || held.is(net.minecraft.world.item.Items.BUCKET)) {
+                    if (!lavaEscape.isRoundActive()) {
+                        return InteractionResult.FAIL;
+                    }
                     if (level.isClientSide()) {
                         return InteractionResult.PASS;
                     }
@@ -334,7 +337,7 @@ public class GameshowProtectionManager {
                     if (state.canBeReplaced()) {
                         placePos = clickedPos;
                     }
-                    if (lavaEscape.getArena().isInsideArena(placePos) || lavaEscape.getArena().isInsideArena(clickedPos)) {
+                    if (lavaEscape.isInsideBuildZone(placePos) || lavaEscape.isInsideBuildZone(clickedPos)) {
                         lavaEscape.trackPlacedBlock(placePos);
                         return InteractionResult.PASS;
                     }

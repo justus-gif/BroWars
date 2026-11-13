@@ -164,10 +164,22 @@ public class ModUpdater {
                 Path updateFile = modsDir.resolve("BroWars.jar.update");
                 Files.move(tempFile, updateFile, StandardCopyOption.REPLACE_EXISTING);
 
+                Path batFile = Path.of(System.getProperty("java.io.tmpdir"), "browars-update.bat");
+                String batContent = "@echo off\r\n"
+                        + "for /L %%i in (1,1,45) do (\r\n"
+                        + "  del /f /q \"" + oldJar.toAbsolutePath() + "\" >nul 2>&1\r\n"
+                        + "  if not exist \"" + oldJar.toAbsolutePath() + "\" goto movefile\r\n"
+                        + "  ping -n 2 127.0.0.1 >nul\r\n"
+                        + ")\r\n"
+                        + ":movefile\r\n"
+                        + "del /f /q \"" + finalTarget.toAbsolutePath() + "\" >nul 2>&1\r\n"
+                        + "move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\" >nul 2>&1\r\n"
+                        + "del /f /q \"%~f0\" >nul 2>&1\r\n";
+                Files.writeString(batFile, batContent);
+
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     try {
-                        new ProcessBuilder("cmd", "/c",
-                                "ping -n 3 127.0.0.1 >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\" & del /f /q \"" + finalTarget.toAbsolutePath() + "\" & move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\"")
+                        new ProcessBuilder("cmd", "/c", "start", "", "/min", "cmd", "/c", batFile.toAbsolutePath().toString())
                                 .start();
                     } catch (Exception ignored) {}
                 }));

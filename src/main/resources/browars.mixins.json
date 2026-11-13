@@ -19,7 +19,8 @@
     "MannequinAccess",
     "ServerPlayerMixin",
     "ThrownEnderpearlMixin",
-    "KillCommandMixin"
+    "KillCommandMixin",
+    "MinecraftServerMixin"
   ],
   "client": [
     "AbstractClientPlayerMixin",
