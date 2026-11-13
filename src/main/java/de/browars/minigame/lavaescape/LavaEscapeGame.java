@@ -169,9 +169,9 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         if (!arena.hasArena()) return false;
         BlockPos min = arena.getMinPos();
         BlockPos max = arena.getMaxPos();
-        return pos.getX() >= min.getX() - 1 && pos.getX() <= max.getX() + 1
-                && pos.getY() >= min.getY() - 1 && pos.getY() <= max.getY() + 3
-                && pos.getZ() >= min.getZ() - 1 && pos.getZ() <= max.getZ() + 1;
+        return pos.getX() >= min.getX() - 2 && pos.getX() <= max.getX() + 2
+                && pos.getY() >= min.getY() - 2 && pos.getY() <= max.getY() + 10
+                && pos.getZ() >= min.getZ() - 2 && pos.getZ() <= max.getZ() + 2;
     }
 
     public void removePlayerPlacedBlock(BlockPos pos) {
@@ -461,23 +461,24 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         }
 
         int area = Math.max(1, (maxX - minX + 1) * (maxZ - minZ + 1));
-        int desiredChests = Math.max(6, Math.min(24, area / 16));
+        int height = Math.max(1, maxY - minY + 1);
+        int desiredChests = Math.max(8, Math.min(32, (area / 16) + (height / 6)));
 
         if (chestPositions.size() >= desiredChests) {
             de.browars.BroWarsMod.LOGGER.info("[Lava Escape] {} vorplatzierte Kisten gefunden und befüllt.", chestPositions.size());
             return;
         }
 
-        // 2. Collect valid platforms randomly across ALL heights (minY..maxY)
-        List<BlockPos> validPlatforms = collectValidChestPlatforms(level, minX, maxX, minY, maxY, minZ, maxZ, true);
+        // 2. Collect valid 3D chest spots randomly across ALL heights (in mid-air or on platforms)
+        List<BlockPos> validSpots = collectValidChestSpots(level, minX, maxX, minY, maxY, minZ, maxZ, true);
 
-        if (validPlatforms.isEmpty()) {
-            de.browars.BroWarsMod.LOGGER.warn("[Lava Escape] Keine Plattformen für Kistengenerierung gefunden im Bereich {} bis {}", min.toShortString(), max.toShortString());
+        if (validSpots.isEmpty()) {
+            de.browars.BroWarsMod.LOGGER.warn("[Lava Escape] Keine freien Positionen für Kistengenerierung gefunden im Bereich {} bis {}", min.toShortString(), max.toShortString());
             return;
         }
 
         int needed = desiredChests - chestPositions.size();
-        List<BlockPos> chosen = selectDistributedChests(validPlatforms, chestPositions, needed, random);
+        List<BlockPos> chosen = selectDistributedChests(validSpots, chestPositions, needed, random);
         for (BlockPos cPos : chosen) {
             arenaSnapshot.putIfAbsent(cPos, level.getBlockState(cPos));
             level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
@@ -514,26 +515,28 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
 
         RandomSource random = level.getRandom();
         int area = Math.max(1, (maxX - minX + 1) * (maxZ - minZ + 1));
-        int desiredChests = Math.max(6, Math.min(24, area / 16));
+        int height = Math.max(1, maxY - minY + 1);
+        int desiredChests = Math.max(8, Math.min(32, (area / 16) + (height / 6)));
 
-        List<BlockPos> validPlatforms = new ArrayList<>();
+        List<BlockPos> validSpots = new ArrayList<>();
         BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
-        int searchMaxY = Math.max(minY, maxY - 1);
+        int searchMinY = Math.min(maxY, minY + 1);
+        int searchMaxY = Math.max(searchMinY, maxY - 1);
 
-        for (int y = minY; y <= searchMaxY; y++) {
+        for (int y = searchMinY; y <= searchMaxY; y++) {
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     mpos.set(x, y, z);
                     if (isValidChestSpot(level, mpos)) {
-                        validPlatforms.add(mpos.above().immutable());
+                        validSpots.add(mpos.immutable());
                     }
                 }
             }
         }
 
-        if (validPlatforms.isEmpty()) return 0;
+        if (validSpots.isEmpty()) return 0;
 
-        List<BlockPos> chosen = selectDistributedChests(validPlatforms, Set.of(), desiredChests, random);
+        List<BlockPos> chosen = selectDistributedChests(validSpots, Set.of(), desiredChests, random);
         int placed = 0;
         for (BlockPos cPos : chosen) {
             level.setBlock(cPos, Blocks.CHEST.defaultBlockState(), 3);
@@ -544,20 +547,9 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         return placed;
     }
 
-    private static boolean isValidChestSpot(ServerLevel level, BlockPos floorPos) {
-        BlockState floor = level.getBlockState(floorPos);
-        if (floor.isAir() || floor.is(Blocks.LAVA) || floor.is(Blocks.WATER)
-                || floor.is(Blocks.CHEST) || floor.is(Blocks.BARREL)
-                || floor.is(Blocks.SCAFFOLDING) || floor.is(Blocks.COBWEB)) {
-            return false;
-        }
-        if (!floor.isSolid() && floor.getCollisionShape(level, floorPos).isEmpty()) {
-            return false;
-        }
-
-        BlockPos chestPos = floorPos.above();
+    private static boolean isValidChestSpot(ServerLevel level, BlockPos chestPos) {
         BlockState chestSpace = level.getBlockState(chestPos);
-        if (chestSpace.is(Blocks.LAVA) || chestSpace.is(Blocks.WATER) || chestSpace.is(Blocks.CHEST)) {
+        if (chestSpace.is(Blocks.LAVA) || chestSpace.is(Blocks.WATER) || chestSpace.is(Blocks.CHEST) || chestSpace.is(Blocks.BARREL)) {
             return false;
         }
         if (!chestSpace.isAir() && !chestSpace.canBeReplaced()) {
@@ -575,26 +567,26 @@ public class LavaEscapeGame extends AbstractDuelGame<LavaEscapeArenaData> {
         return true;
     }
 
-    private List<BlockPos> collectValidChestPlatforms(ServerLevel level, int startX, int endX, int minY, int maxY, int startZ, int endZ, boolean checkSpawns) {
-        List<BlockPos> validPlatforms = new ArrayList<>();
+    private List<BlockPos> collectValidChestSpots(ServerLevel level, int startX, int endX, int minY, int maxY, int startZ, int endZ, boolean checkSpawns) {
+        List<BlockPos> validSpots = new ArrayList<>();
         BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
-        int searchMaxY = Math.max(minY, maxY - 1);
+        int searchMinY = Math.min(maxY, minY + 1);
+        int searchMaxY = Math.max(searchMinY, maxY - 1);
 
-        for (int y = minY; y <= searchMaxY; y++) {
+        for (int y = searchMinY; y <= searchMaxY; y++) {
             for (int x = startX; x <= endX; x++) {
                 for (int z = startZ; z <= endZ; z++) {
                     mpos.set(x, y, z);
                     if (!isValidChestSpot(level, mpos)) continue;
 
-                    BlockPos chestPos = mpos.above();
-                    if (chestPositions.contains(chestPos)) continue;
-                    if (checkSpawns && (isNearSpawn(chestPos, 1) || isNearSpawn(chestPos, 2))) continue;
+                    if (chestPositions.contains(mpos)) continue;
+                    if (checkSpawns && (isNearSpawn(mpos, 1) || isNearSpawn(mpos, 2))) continue;
 
-                    validPlatforms.add(chestPos.immutable());
+                    validSpots.add(mpos.immutable());
                 }
             }
         }
-        return validPlatforms;
+        return validSpots;
     }
 
     private static List<BlockPos> selectDistributedChests(List<BlockPos> candidates, Set<BlockPos> existing, int count, RandomSource random) {

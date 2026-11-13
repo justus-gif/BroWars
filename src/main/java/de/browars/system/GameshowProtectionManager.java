@@ -321,6 +321,9 @@ public class GameshowProtectionManager {
                         }
                         return InteractionResult.PASS;
                     }
+                    if (player instanceof ServerPlayer serverPlayer) {
+                        serverPlayer.sendSystemMessage(Component.literal("§c[Lava Escape] Außerhalb der Bauzone!"), true);
+                    }
                     return InteractionResult.FAIL;
                 }
 

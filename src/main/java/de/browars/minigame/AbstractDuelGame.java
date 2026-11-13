@@ -42,10 +42,10 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
     protected final TeamColor p1Team, p2Team;
     protected final boolean isSoloMode;
     protected final DuelScore score;
-    protected Phase phase = Phase.COUNTDOWN;
+    protected volatile Phase phase = Phase.COUNTDOWN;
     protected int phaseTicks = 100;
     protected int playTicks;
-    private boolean running = true;
+    private volatile boolean running = true;
     private boolean started;
     private String centerTitle = "", centerSubtitle = "";
     private int titleColor = 0xFFFFFFFF, titleTicks, titleTotalTicks;
