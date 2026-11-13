@@ -99,13 +99,18 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
     }
 
     @Override
+    protected GameType defaultGameType() {
+        return GameType.SURVIVAL;
+    }
+
+    @Override
     protected int targetScore() {
         return 2; // Best of 3: first to 2 points
     }
 
     @Override
     protected String matchStatus() {
-        return "Best of 3 • Erster zu 2";
+        return "";
     }
 
     @Override
@@ -138,6 +143,17 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         if (vaultPhase == VaultPhase.LOOTING) return LOOT_DURATION_TICKS;
         if (vaultPhase == VaultPhase.COMBAT) return COMBAT_LIMIT_TICKS;
         return -1;
+    }
+
+    @Override
+    protected String targetName() {
+        if (phase != Phase.PLAYING) return "";
+        int remTicks = timerRemaining();
+        if (remTicks < 0) return "";
+        int remSeconds = (remTicks + 19) / 20;
+        int mins = remSeconds / 60;
+        int secs = remSeconds % 60;
+        return String.format(java.util.Locale.ROOT, "%02d:%02d", mins, secs);
     }
 
     public boolean isCombatActive() {
@@ -258,8 +274,7 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
             if (p2 != null) setupPlayerForLooting(p2);
         }
 
-        message("§eDie 1:30-minütige Loot-Phase hat begonnen! Öffne Vaults & nutze den Amboss!");
-        setCenterTitle("§6§lLOOT-PHASE!", "1:30 Minuten Zeit!", 0xFFF59E0B, 40);
+        setCenterTitle("§6§lLOOT", "", 0xFFF59E0B, 35);
         playSound(SoundEvents.NOTE_BLOCK_BELL, 1.0f);
         playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.8f);
     }
@@ -298,7 +313,7 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
 
             if (lootingTicksLeft <= 100 && lootingTicksLeft > 0 && lootingTicksLeft % 20 == 0) {
                 int secondsLeft = lootingTicksLeft / 20;
-                setCenterTitle(Integer.toString(secondsLeft), "Zaun fällt gleich!", secondsLeft > 2 ? 0xFFFBBF24 : 0xFFEF4444, 20);
+                setCenterTitle(Integer.toString(secondsLeft), "", secondsLeft > 2 ? 0xFFFBBF24 : 0xFFEF4444, 20);
                 playSound(SoundEvents.NOTE_BLOCK_PLING, new float[]{0, 2.0f, 1.6f, 1.3f, 1.1f, 0.9f}[secondsLeft]);
             }
 
@@ -322,18 +337,16 @@ public class VaultWarGame extends AbstractDuelGame<VaultWarArenaData> {
         vaultPhase = VaultPhase.COMBAT;
         removeFence();
 
-        setCenterTitle("§c§lKAMPF!", "Der Zaun ist gefallen – besiege deinen Gegner!", 0xFFEF4444, 50);
+        setCenterTitle("§c§lKAMPF!", "", 0xFFEF4444, 40);
         playSound(SoundEvents.NOTE_BLOCK_PLING, 2.0f);
         playSound(SoundEvents.IRON_DOOR_OPEN, 1.0f);
-        message("§c§lKAMPF! §eDer Zaun ist gefallen! PvP ist jetzt aktiviert!");
         MinigameManager.getInstance().broadcastHud(server, getHudState());
     }
 
     private void startSuddenDeath() {
         vaultPhase = VaultPhase.SUDDEN_DEATH;
-        setCenterTitle("§4§lSUDDEN DEATH!", "Zeit abgelaufen (-1 ❤ alle 2s)", 0xFFDC2626, 60);
+        setCenterTitle("§4§lSUDDEN DEATH", "", 0xFFDC2626, 50);
         playSound(SoundEvents.NOTE_BLOCK_BASS, 0.8f);
-        message("§4§l[Vault War] SUDDEN DEATH! Zeitlimit erreicht!");
         MinigameManager.getInstance().broadcastHud(server, getHudState());
     }
 

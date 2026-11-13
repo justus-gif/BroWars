@@ -62,47 +62,32 @@ public class PaintWarRouletteHudElement implements HudElement {
         Font font = mc.font;
 
         int screenW = extractor.guiWidth();
-        int cardW = 104;
-        int cardH = 58;
-        int right = screenW - 10;
+        int cardW = 98;
+        int cardH = 48;
+        int right = screenW - 8;
         int left = right - cardW;
-        int top = 10;
+        int top = 8;
         int bottom = top + cardH;
         int centerX = left + cardW / 2;
 
         boolean finishedSpin = remSpin <= 0;
 
-        // Compute smooth decelerating reel position
         float t = finishedSpin ? 1.0f : Math.clamp(1.0f - ((remSpin - partial) / (float) totalSpin), 0.0f, 1.0f);
-        // Cubic ease-out from (targetIndex - 14) to targetIndex
         float easeOut = 1.0f - (float) Math.pow(1.0f - t, 3.0);
         int totalSteps = 14;
         float startSlot = targetIndex - totalSteps;
         float currentSlotFloat = startSlot + easeOut * totalSteps;
 
-        // Card outer frame & dark glass plate
-        int borderColor = finishedSpin ? 0xFF22C55E : 0xFFF59E0B;
-        extractor.fill(left - 1, top - 1, right + 1, bottom + 1, 0xCC000000);
-        extractor.fill(left, top, right, bottom, 0xEE0F172A);
-        // Top & bottom accent bars
-        extractor.fill(left, top, right, top + 2, borderColor);
-        extractor.fill(left, bottom - 2, right, bottom, borderColor);
-        extractor.fill(left, top, left + 2, bottom, borderColor);
-        extractor.fill(right - 2, top, right, bottom, borderColor);
+        BroWarsUiHelper.drawPanel(extractor, left, top, right, bottom, BroWarsUiHelper.ACCENT_GOLD);
 
-        // Header title
-        String header = finishedSpin ? "§a§lITEM ERHALTEN" : "§6§lGLÜCKSBOX";
-        extractor.centeredText(font, header, centerX, top + 5, 0xFFFFFFFF);
-
-        // Reel window in center
         int slotSize = 24;
         int winLeft = centerX - slotSize / 2;
-        int winTop = top + 16;
+        int winTop = top + 6;
         int winRight = winLeft + slotSize;
         int winBottom = winTop + slotSize;
 
-        extractor.fill(winLeft - 1, winTop - 1, winRight + 1, winBottom + 1, finishedSpin ? 0xFFFFD700 : 0xFF475569);
-        extractor.fill(winLeft, winTop, winRight, winBottom, 0xFF1E293B);
+        extractor.fill(winLeft - 1, winTop - 1, winRight + 1, winBottom + 1, finishedSpin ? BroWarsUiHelper.ACCENT_GOLD : BroWarsUiHelper.BORDER_SUBTLE);
+        extractor.fill(winLeft, winTop, winRight, winBottom, BroWarsUiHelper.BG_REEL);
 
         int baseIndex = (int) Math.floor(currentSlotFloat);
         float frac = currentSlotFloat - baseIndex;
@@ -111,12 +96,14 @@ public class PaintWarRouletteHudElement implements HudElement {
         for (int offset = -1; offset <= 2; offset++) {
             int idx = Math.floorMod(baseIndex + offset, count);
             ItemStack icon = getIconForReward(rewards[idx]);
-            int itemY = Math.round(winTop + 4 + (offset - frac) * 22.0f);
-            extractor.fakeItem(icon, winLeft + 4, itemY);
+            float itemY = winTop + 4.0f + (offset - frac) * 22.0f;
+            extractor.pose().pushMatrix();
+            extractor.pose().translate(0.0f, itemY);
+            extractor.fakeItem(icon, winLeft + 4, 0);
+            extractor.pose().popMatrix();
         }
         extractor.disableScissor();
 
-        // Display name of currently centered item
         int activeIdx = finishedSpin ? targetIndex : Math.floorMod(Math.round(currentSlotFloat), count);
         String itemLabel = getShortLabel(rewards[activeIdx]);
         extractor.centeredText(font, itemLabel, centerX, bottom - 12, 0xFFFFFFFF);

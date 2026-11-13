@@ -167,7 +167,7 @@ public class ModUpdater {
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                     try {
                         new ProcessBuilder("cmd", "/c",
-                                "timeout /t 2 /nobreak >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\" & del /f /q \"" + finalTarget.toAbsolutePath() + "\" & move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\"")
+                                "ping -n 3 127.0.0.1 >nul & del /f /q \"" + oldJar.toAbsolutePath() + "\" & del /f /q \"" + finalTarget.toAbsolutePath() + "\" & move /y \"" + updateFile.toAbsolutePath() + "\" \"" + finalTarget.toAbsolutePath() + "\"")
                                 .start();
                     } catch (Exception ignored) {}
                 }));

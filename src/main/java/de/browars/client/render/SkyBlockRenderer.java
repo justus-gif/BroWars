@@ -15,7 +15,14 @@ import net.minecraft.world.phys.Vec3;
 
 public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, SkyBlockRenderState> {
 
+    static {
+        SkyBlockEntity.clientOnAdd = SkyBlockClientManager::register;
+        SkyBlockEntity.clientOnRemove = SkyBlockClientManager::unregister;
+    }
+
     public SkyBlockRenderer(BlockEntityRendererProvider.Context context) {
+        SkyBlockEntity.clientOnAdd = SkyBlockClientManager::register;
+        SkyBlockEntity.clientOnRemove = SkyBlockClientManager::unregister;
     }
 
     @Override
@@ -25,7 +32,11 @@ public class SkyBlockRenderer implements BlockEntityRenderer<SkyBlockEntity, Sky
 
     @Override
     public boolean shouldRender(SkyBlockEntity blockEntity, Vec3 cameraPos) {
-        return true;
+        if (!blockEntity.clientRegistered) {
+            SkyBlockClientManager.register(blockEntity);
+        }
+        // Individual block entity rendering is bypassed in favor of the single greedy-meshed batch in SkyBlockClientManager
+        return false;
     }
 
     @Override

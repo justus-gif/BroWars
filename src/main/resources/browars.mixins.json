@@ -16,8 +16,10 @@
     "DisplayAccess",
     "BlockDisplayAccess",
     "TextDisplayAccess",
+    "MannequinAccess",
     "ServerPlayerMixin",
-    "ThrownEnderpearlMixin"
+    "ThrownEnderpearlMixin",
+    "KillCommandMixin"
   ],
   "client": [
     "AbstractClientPlayerMixin",

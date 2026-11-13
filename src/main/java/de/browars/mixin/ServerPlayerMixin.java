@@ -18,6 +18,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ServerPlayer.class)
 public class ServerPlayerMixin {
 
+    @Inject(method = "canHarmPlayer", at = @At("HEAD"), cancellable = true)
+    private void browars$allowMinigamePvp(net.minecraft.world.entity.player.Player other, org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<Boolean> cir) {
+        ServerPlayer self = (ServerPlayer) (Object) this;
+        Minigame active = MinigameManager.getInstance().getActiveGame();
+        if (active != null && active.isRunning()
+                && active.isPlayerParticipating(self.getUUID())
+                && other != null && active.isPlayerParticipating(other.getUUID())) {
+            cir.setReturnValue(true);
+        }
+    }
+
     /**
      * Intercepts ServerPlayer death at HEAD before ClientboundPlayerCombatKillPacket is sent.
      * Prevents the Minecraft "You Died! / Du bist gestorben" screen from ever appearing.
@@ -38,8 +49,16 @@ public class ServerPlayerMixin {
         }
 
         Minigame active = MinigameManager.getInstance().getActiveGame();
-        if (active instanceof AbstractDuelGame<?> duel && duel.isRoundActive() && duel.isPlayerParticipating(player.getUUID())) {
-            duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+        if (active instanceof AbstractDuelGame<?> duel && duel.isRunning() && duel.isPlayerParticipating(player.getUUID())) {
+            if (duel.isRoundActive()) {
+                duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+            } else {
+                duel.onPlayerRespawn(player);
+            }
+            return;
+        }
+        if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInShow(player.getUUID())) {
+            de.browars.gameshow.GameshowManager.getInstance().onPlayerRespawn(player);
             return;
         }
 

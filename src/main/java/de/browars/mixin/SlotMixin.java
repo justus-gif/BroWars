@@ -15,7 +15,8 @@ public class SlotMixin {
 
     @Inject(method = "mayPickup", at = @At("HEAD"), cancellable = true)
     private void browars$preventGameItemRemoval(Player player, CallbackInfoReturnable<Boolean> cir) {
-        if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame) {
+        if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame
+                || MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame) {
             return;
         }
         Slot self = (Slot) (Object) this;
@@ -29,7 +30,8 @@ public class SlotMixin {
 
     @Inject(method = "mayPlace", at = @At("HEAD"), cancellable = true)
     private void browars$lockMinigameSlots(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
-        if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame) {
+        if (MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.vaultwar.VaultWarGame
+                || MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame) {
             return;
         }
         Slot self = (Slot) (Object) this;

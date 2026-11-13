@@ -38,6 +38,9 @@ public class GameshowProtectionManager {
     public static void register() {
         // 1. Prevent block break start / mining animation in survival
         AttackBlockCallback.EVENT.register((Player player, Level level, InteractionHand hand, BlockPos pos, net.minecraft.core.Direction direction) -> {
+            if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInBlackRoom(player.getUUID())) {
+                return InteractionResult.FAIL;
+            }
             if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID()) && player.isCreative()) {
                 return InteractionResult.PASS;
             }
@@ -81,6 +84,9 @@ public class GameshowProtectionManager {
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
                     && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
                 if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
+                    if (!lavaEscape.isRoundActive()) {
+                        return InteractionResult.FAIL;
+                    }
                     return InteractionResult.PASS;
                 }
                 sendActionBarWarning(player);
@@ -90,6 +96,13 @@ public class GameshowProtectionManager {
             if (level.isClientSide() && de.browars.minigame.MinigamePlayerState.isGameItem(player.getMainHandItem())
                     && player.getMainHandItem().has(net.minecraft.core.component.DataComponents.CAN_BREAK)) {
                 return InteractionResult.PASS;
+            }
+
+            if (level.isClientSide() && de.browars.client.minigame.MinigameHudClientHolder.isActive()) {
+                String activeId = de.browars.client.minigame.MinigameHudClientHolder.getState().gameId();
+                if ("lavaescape".equals(activeId) || "vaultwar".equals(activeId) || "spleef".equals(activeId)) {
+                    return InteractionResult.PASS;
+                }
             }
 
             if (!protectionEnabled) return InteractionResult.PASS;
@@ -104,6 +117,9 @@ public class GameshowProtectionManager {
 
         // 2. Prevent actual block break execution
         PlayerBlockBreakEvents.BEFORE.register((Level level, Player player, BlockPos pos, BlockState state, BlockEntity blockEntity) -> {
+            if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInBlackRoom(player.getUUID())) {
+                return false;
+            }
             if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID()) && player.isCreative()) {
                 return true;
             }
@@ -137,11 +153,21 @@ public class GameshowProtectionManager {
             if (de.browars.minigame.MinigameManager.getInstance().getActiveGame() instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape
                     && lavaEscape.isRunning() && lavaEscape.isPlayerParticipating(player.getUUID())) {
                 if (lavaEscape.isPlayerPlacedBlock(pos) || lavaEscape.isChestBlock(pos)) {
+                    if (!lavaEscape.isRoundActive()) {
+                        return false;
+                    }
                     lavaEscape.removePlayerPlacedBlock(pos);
                     return true;
                 }
                 sendActionBarWarning(player);
                 return false;
+            }
+
+            if (level.isClientSide() && de.browars.client.minigame.MinigameHudClientHolder.isActive()) {
+                String activeId = de.browars.client.minigame.MinigameHudClientHolder.getState().gameId();
+                if ("lavaescape".equals(activeId) || "vaultwar".equals(activeId) || "spleef".equals(activeId)) {
+                    return true;
+                }
             }
 
             if (!protectionEnabled) return true;
@@ -156,6 +182,9 @@ public class GameshowProtectionManager {
 
         // 3. Prevent block placing & block interactions (doors, trapdoors, chests, levers, etc.)
         UseBlockCallback.EVENT.register((Player player, Level level, InteractionHand hand, BlockHitResult hitResult) -> {
+            if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInBlackRoom(player.getUUID())) {
+                return InteractionResult.FAIL;
+            }
             if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID()) && player.isCreative()) {
                 return InteractionResult.PASS;
             }
@@ -225,11 +254,15 @@ public class GameshowProtectionManager {
 
                 // 3. Placing utility blocks (e.g. Cobwebs)
                 if (held.getItem() instanceof net.minecraft.world.item.BlockItem) {
-                    BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
-                    if (state.canBeReplaced()) {
-                        placePos = hitResult.getBlockPos();
+                    if (level.isClientSide()) {
+                        return InteractionResult.PASS;
                     }
-                    if (vaultWar.getArena().isInsideArena(placePos)) {
+                    BlockPos clickedPos = hitResult.getBlockPos();
+                    BlockPos placePos = clickedPos.relative(hitResult.getDirection());
+                    if (state.canBeReplaced()) {
+                        placePos = clickedPos;
+                    }
+                    if (vaultWar.getArena().isInsideArena(placePos) || vaultWar.getArena().isInsideArena(clickedPos)) {
                         vaultWar.trackPlacedBlock(placePos);
                         return InteractionResult.PASS;
                     }
@@ -245,20 +278,47 @@ public class GameshowProtectionManager {
                 BlockState state = level.getBlockState(hitResult.getBlockPos());
                 ItemStack held = player.getItemInHand(hand);
 
-                // 1. Opening chests / barrels in the arena
-                if (state.is(net.minecraft.world.level.block.Blocks.CHEST)
-                        || state.is(net.minecraft.world.level.block.Blocks.BARREL)) {
+                // 1. Opening chests / barrels in the arena (unless sneaking with a block/item to place against the chest)
+                if ((state.is(net.minecraft.world.level.block.Blocks.CHEST)
+                        || state.is(net.minecraft.world.level.block.Blocks.BARREL))
+                        && (!player.isSecondaryUseActive() || held.isEmpty())) {
+                    if (!lavaEscape.isRoundActive()) {
+                        if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+                            serverPlayer.sendSystemMessage(Component.literal("§c[Lava Escape] Kisten können erst nach Ablauf des Countdowns geöffnet werden!"), true);
+                            level.playSound(null, hitResult.getBlockPos(), net.minecraft.sounds.SoundEvents.CHEST_LOCKED, net.minecraft.sounds.SoundSource.BLOCKS, 0.8f, 1.0f);
+                        }
+                        return InteractionResult.FAIL;
+                    }
+                    // Directly open the container on the server even if a solid block was built above the chest
+                    if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+                        BlockEntity be = level.getBlockEntity(hitResult.getBlockPos());
+                        if (be instanceof net.minecraft.world.MenuProvider menuProvider) {
+                            serverPlayer.openMenu(menuProvider);
+                            return InteractionResult.SUCCESS;
+                        }
+                    }
                     return InteractionResult.PASS;
                 }
 
-                // 2. Placing blocks (Cobblestone, Scaffolding, Cobwebs, etc.)
+                // 2. Placing blocks (Cobblestone, Scaffolding, Cobwebs, Ladders, Twisting Vines, etc.)
                 if (held.getItem() instanceof net.minecraft.world.item.BlockItem) {
-                    BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
-                    if (state.canBeReplaced()) {
-                        placePos = hitResult.getBlockPos();
+                    if (!lavaEscape.isRoundActive()) {
+                        return InteractionResult.FAIL;
                     }
-                    if (lavaEscape.getArena().isInsideArena(placePos)) {
-                        if (!level.isClientSide()) lavaEscape.trackPlacedBlock(placePos);
+                    if (level.isClientSide()) {
+                        return InteractionResult.PASS;
+                    }
+                    BlockPos clickedPos = hitResult.getBlockPos();
+                    BlockPos placePos = clickedPos.relative(hitResult.getDirection());
+                    if (state.canBeReplaced()) {
+                        placePos = clickedPos;
+                    }
+                    // Allow placing if either placePos or clickedPos (e.g. stacking scaffolding/vines) is inside the arena
+                    if (lavaEscape.getArena().isInsideArena(placePos) || lavaEscape.getArena().isInsideArena(clickedPos)) {
+                        lavaEscape.trackPlacedBlock(placePos);
+                        if (!placePos.equals(clickedPos)) {
+                            lavaEscape.trackPlacedBlock(clickedPos);
+                        }
                         return InteractionResult.PASS;
                     }
                     return InteractionResult.FAIL;
@@ -266,12 +326,16 @@ public class GameshowProtectionManager {
 
                 // 3. Placing water or picking up water with bucket
                 if (held.is(net.minecraft.world.item.Items.WATER_BUCKET) || held.is(net.minecraft.world.item.Items.BUCKET)) {
-                    BlockPos placePos = hitResult.getBlockPos().relative(hitResult.getDirection());
-                    if (state.canBeReplaced()) {
-                        placePos = hitResult.getBlockPos();
+                    if (level.isClientSide()) {
+                        return InteractionResult.PASS;
                     }
-                    if (lavaEscape.getArena().isInsideArena(placePos)) {
-                        if (!level.isClientSide()) lavaEscape.trackPlacedBlock(placePos);
+                    BlockPos clickedPos = hitResult.getBlockPos();
+                    BlockPos placePos = clickedPos.relative(hitResult.getDirection());
+                    if (state.canBeReplaced()) {
+                        placePos = clickedPos;
+                    }
+                    if (lavaEscape.getArena().isInsideArena(placePos) || lavaEscape.getArena().isInsideArena(clickedPos)) {
+                        lavaEscape.trackPlacedBlock(placePos);
                         return InteractionResult.PASS;
                     }
                     return InteractionResult.FAIL;
@@ -279,6 +343,13 @@ public class GameshowProtectionManager {
 
                 // 4. Combat & utility item use (weapons, potions, wind charges, rods, food)
                 return InteractionResult.PASS;
+            }
+
+            if (level.isClientSide() && de.browars.client.minigame.MinigameHudClientHolder.isActive()) {
+                String activeId = de.browars.client.minigame.MinigameHudClientHolder.getState().gameId();
+                if ("lavaescape".equals(activeId) || "vaultwar".equals(activeId)) {
+                    return InteractionResult.PASS;
+                }
             }
 
             if (!protectionEnabled) return InteractionResult.PASS;

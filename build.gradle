@@ -115,15 +115,16 @@ ext.deployJarFiles = { File jarFile ->
     deployDirs.each { deployDir ->
         if (deployDir.exists() && deployDir.isDirectory()) {
             deployDir.listFiles().each { file ->
-                if (file.name.startsWith("browars") && file.name.endsWith(".jar")) {
+                if (file.name.toLowerCase(java.util.Locale.ROOT).startsWith("browars") && file.name.endsWith(".jar")) {
                     file.delete()
                 }
             }
             copy {
                 from jarFile
                 into deployDir
+                rename { "BroWars.jar" }
             }
-            println "[BroWars] Mod automatisch aktualisiert in Profil-Mod-Ordner: ${deployDir.absolutePath}/${jarFile.name}"
+            println "[BroWars] Mod automatisch aktualisiert in Profil-Mod-Ordner: ${deployDir.absolutePath}/BroWars.jar"
         }
     }
 

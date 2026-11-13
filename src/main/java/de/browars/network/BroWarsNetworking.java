@@ -47,6 +47,8 @@ public final class BroWarsNetworking {
         PayloadTypeRegistry.clientboundPlay().register(SyncCrossWarPlayerPayload.TYPE, SyncCrossWarPlayerPayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncPaintWarRoulettePayload.TYPE, SyncPaintWarRoulettePayload.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(OpenParkourLeaderboardPayload.TYPE, OpenParkourLeaderboardPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SyncGameshowHudPayload.TYPE, SyncGameshowHudPayload.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SyncGameshowColorSelectPayload.TYPE, SyncGameshowColorSelectPayload.CODEC);
 
         // C2S
         PayloadTypeRegistry.serverboundPlay().register(SaveTeleportBlockPayload.TYPE, SaveTeleportBlockPayload.CODEC);
@@ -60,8 +62,16 @@ public final class BroWarsNetworking {
         PayloadTypeRegistry.serverboundPlay().register(CrossWarShootPayload.TYPE, CrossWarShootPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(CrossWarReloadPayload.TYPE, CrossWarReloadPayload.CODEC);
         PayloadTypeRegistry.serverboundPlay().register(DeleteParkourScorePayload.TYPE, DeleteParkourScorePayload.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(SelectGameshowColorPayload.TYPE, SelectGameshowColorPayload.CODEC);
 
         // C2S Receivers
+        ServerPlayNetworking.registerGlobalReceiver(SelectGameshowColorPayload.TYPE, (payload, context) -> {
+            ServerPlayer player = context.player();
+            player.level().getServer().execute(() -> {
+                de.browars.gameshow.GameshowManager.getInstance().onPlayerSelectColor(player, payload.colorId(), payload.toggleReady());
+            });
+        });
+
         ServerPlayNetworking.registerGlobalReceiver(CrossWarShootPayload.TYPE, (payload, context) -> {
             ServerPlayer player = context.player();
             player.level().getServer().execute(() -> {

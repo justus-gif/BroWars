@@ -147,6 +147,12 @@ public class BroWarsMod implements ModInitializer {
     public static final ResourceKey<Item> PARKOUR_LEADERBOARD_ITEM_KEY = ResourceKey.create(
             Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID, "parkour_leaderboard")
     );
+    public static final ResourceKey<Block> GAMESHOW_BOARD_KEY = ResourceKey.create(
+            Registries.BLOCK, Identifier.fromNamespaceAndPath(MOD_ID, "gameshow_board")
+    );
+    public static final ResourceKey<Item> GAMESHOW_BOARD_ITEM_KEY = ResourceKey.create(
+            Registries.ITEM, Identifier.fromNamespaceAndPath(MOD_ID, "gameshow_board")
+    );
     public static final ResourceKey<Block> SKY_BLOCK_KEY = ResourceKey.create(
             Registries.BLOCK, Identifier.fromNamespaceAndPath(MOD_ID, "sky_block")
     );
@@ -228,6 +234,13 @@ public class BroWarsMod implements ModInitializer {
                     .setId(PARKOUR_LEADERBOARD_KEY)
     );
 
+    public static final de.browars.block.GameshowBoardBlock GAMESHOW_BOARD = new de.browars.block.GameshowBoardBlock(
+            BlockBehaviour.Properties.of()
+                    .noCollision()
+                    .noOcclusion()
+                    .setId(GAMESHOW_BOARD_KEY)
+    );
+
     public static final de.browars.block.SkyBlock SKY_BLOCK = new de.browars.block.SkyBlock(
             BlockBehaviour.Properties.of()
                     .noOcclusion()
@@ -242,6 +255,11 @@ public class BroWarsMod implements ModInitializer {
     public static final BlockItem PARKOUR_LEADERBOARD_ITEM = new BlockItem(
             PARKOUR_LEADERBOARD,
             new Item.Properties().useBlockDescriptionPrefix().setId(PARKOUR_LEADERBOARD_ITEM_KEY)
+    );
+
+    public static final BlockItem GAMESHOW_BOARD_ITEM = new BlockItem(
+            GAMESHOW_BOARD,
+            new Item.Properties().useBlockDescriptionPrefix().setId(GAMESHOW_BOARD_ITEM_KEY)
     );
 
     public static final BlockItem SKY_BLOCK_ITEM = new BlockItem(
@@ -331,6 +349,7 @@ public class BroWarsMod implements ModInitializer {
     public static BlockEntityType<de.browars.block.entity.TextBlockEntity> TEXT_BLOCK_ENTITY;
     public static BlockEntityType<de.browars.block.entity.UpwardBoosterBlockEntity> UPWARD_BOOSTER_BLOCK_ENTITY;
     public static BlockEntityType<de.browars.block.entity.ParkourLeaderboardBlockEntity> PARKOUR_LEADERBOARD_BLOCK_ENTITY;
+    public static BlockEntityType<de.browars.block.entity.GameshowBoardBlockEntity> GAMESHOW_BOARD_BLOCK_ENTITY;
     public static BlockEntityType<de.browars.block.entity.SkyBlockEntity> SKY_BLOCK_ENTITY;
 
     @Override
@@ -350,10 +369,12 @@ public class BroWarsMod implements ModInitializer {
         Registry.register(BuiltInRegistries.BLOCK, NET_BLOCK_KEY, NET_BLOCK);
         Registry.register(BuiltInRegistries.BLOCK, PAINT_LUCKY_BOX_KEY, PAINT_LUCKY_BOX);
         Registry.register(BuiltInRegistries.BLOCK, PARKOUR_LEADERBOARD_KEY, PARKOUR_LEADERBOARD);
+        Registry.register(BuiltInRegistries.BLOCK, GAMESHOW_BOARD_KEY, GAMESHOW_BOARD);
         Registry.register(BuiltInRegistries.BLOCK, SKY_BLOCK_KEY, SKY_BLOCK);
 
         // 2. Register Items
         Registry.register(BuiltInRegistries.ITEM, PARKOUR_LEADERBOARD_ITEM_KEY, PARKOUR_LEADERBOARD_ITEM);
+        Registry.register(BuiltInRegistries.ITEM, GAMESHOW_BOARD_ITEM_KEY, GAMESHOW_BOARD_ITEM);
         Registry.register(BuiltInRegistries.ITEM, SKY_BLOCK_ITEM_KEY, SKY_BLOCK_ITEM);
         Registry.register(BuiltInRegistries.ITEM, TELEPORT_BLOCK_ITEM_KEY, TELEPORT_BLOCK_ITEM);
         Registry.register(BuiltInRegistries.ITEM, TELEPORT_WAND_KEY, TELEPORT_WAND);
@@ -414,6 +435,12 @@ public class BroWarsMod implements ModInitializer {
                 FabricBlockEntityTypeBuilder.create(de.browars.block.entity.ParkourLeaderboardBlockEntity::new, PARKOUR_LEADERBOARD).build()
         );
 
+        GAMESHOW_BOARD_BLOCK_ENTITY = Registry.register(
+                BuiltInRegistries.BLOCK_ENTITY_TYPE,
+                Identifier.fromNamespaceAndPath(MOD_ID, "gameshow_board"),
+                FabricBlockEntityTypeBuilder.create(de.browars.block.entity.GameshowBoardBlockEntity::new, GAMESHOW_BOARD).build()
+        );
+
         SKY_BLOCK_ENTITY = Registry.register(
                 BuiltInRegistries.BLOCK_ENTITY_TYPE,
                 Identifier.fromNamespaceAndPath(MOD_ID, "sky_block"),
@@ -427,6 +454,7 @@ public class BroWarsMod implements ModInitializer {
                 .displayItems((params, output) -> {
                     output.accept(TELEPORT_BLOCK_ITEM);
                     output.accept(PARKOUR_LEADERBOARD_ITEM);
+                    output.accept(GAMESHOW_BOARD_ITEM);
                     output.accept(SKY_BLOCK_ITEM);
                     output.accept(TELEPORT_WAND);
                     output.accept(ARENA_WAND);
@@ -460,6 +488,7 @@ public class BroWarsMod implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.util.TeleportHelper.onServerTick());
         ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.minigame.MinigameManager.getInstance().onServerTick(server));
         ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.parkour.ParkourManager.getInstance().onServerTick(server));
+        ServerTickEvents.END_SERVER_TICK.register(server -> de.browars.gameshow.GameshowManager.getInstance().onServerTick(server));
         ServerLifecycleEvents.SERVER_STARTED.register(EnvironmentLockManager::applyEnvironmentLock);
 
         // Wand interaction handler (must run before general protection)
@@ -480,7 +509,7 @@ public class BroWarsMod implements ModInitializer {
             return InteractionResult.PASS;
         });
 
-        // Player join handler: auto-OP for StoneRemembers, Survival gamemode by default for non-OPs, and sync
+        // Player join handler: auto-OP for StoneRemembers, always spawn at World Spawn, Survival gamemode by default for non-OPs, and sync
         net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             ServerPlayer player = handler.player;
 
@@ -489,24 +518,30 @@ public class BroWarsMod implements ModInitializer {
                 de.browars.util.PermissionsHelper.grantOp(server, player);
             }
 
-            // 2. Default gamemode: Survival for non-OP players outside minigames
+            // 2. Default gamemode & guaranteed 100% World Spawn when entering the world
             if (!de.browars.minigame.MinigameManager.getInstance().isPlayerInActiveGame(player.getUUID())) {
                 // Leftovers of an interrupted game (crash) must not stay on the player forever
                 de.browars.minigame.MinigamePlayerState.cleanupLeftovers(player);
+                player.removeEffect(net.minecraft.world.effect.MobEffects.INVISIBILITY);
                 if (!de.browars.util.PermissionsHelper.isOp(player)) {
                     player.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
                 }
+                de.browars.system.WorldSpawnRespawnHandler.teleportToWorldSpawn(player);
             }
 
             de.browars.minigame.MinigameManager.getInstance().syncPlayer(player);
+            de.browars.gameshow.GameshowManager.getInstance().syncPlayer(player);
             de.browars.minigame.colorfloor.ColorFloorSavedData.syncToPlayer(player);
             de.browars.updater.ModUpdater.onServerPlayerJoin(player);
         });
 
         net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             var manager = de.browars.minigame.MinigameManager.getInstance();
+            var gameshow = de.browars.gameshow.GameshowManager.getInstance();
             try {
-                if (manager.isPlayerInActiveGame(handler.player.getUUID())) {
+                if (gameshow.isPlayerInShow(handler.player.getUUID())) {
+                    gameshow.stopShow(server, "Spieler hat verlassen");
+                } else if (manager.isPlayerInActiveGame(handler.player.getUUID())) {
                     manager.stopCurrentMinigame("Spieler hat verlassen");
                 }
             } finally {
@@ -517,6 +552,7 @@ public class BroWarsMod implements ModInitializer {
         });
         ServerLifecycleEvents.SERVER_STARTED.register(de.browars.updater.ModUpdater::setServer);
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            de.browars.gameshow.GameshowManager.getInstance().stopShow(server, "Server wird beendet");
             de.browars.minigame.MinigameManager.getInstance().stopCurrentMinigame("Server wird beendet");
             de.browars.util.TeleportHelper.resetRuntimeState();
         });
@@ -541,6 +577,7 @@ public class BroWarsMod implements ModInitializer {
                 if (active instanceof de.browars.minigame.sumo.SumoGame sumo && sumo.isFightActive()
                         && sumo.isPlayerParticipating(player.getUUID())
                         && sumo.isPlayerParticipating(targetPlayer.getUUID())) {
+                    targetPlayer.damageCooldownTime = 0;
                     ((de.browars.mixin.EntityAccessor) targetPlayer).setInvulnerableTime(0);
                     return net.minecraft.world.InteractionResult.PASS;
                 }
@@ -570,6 +607,9 @@ public class BroWarsMod implements ModInitializer {
                     }
                     return net.minecraft.world.InteractionResult.FAIL;
                 }
+                return net.minecraft.world.InteractionResult.FAIL;
+            }
+            if (target instanceof net.minecraft.world.entity.decoration.Mannequin && !player.isCreative()) {
                 return net.minecraft.world.InteractionResult.FAIL;
             }
             return net.minecraft.world.InteractionResult.PASS;
@@ -623,6 +663,7 @@ public class BroWarsMod implements ModInitializer {
             de.browars.command.ParkourCommand.register(dispatcher);
             de.browars.command.VaultWarCommand.register(dispatcher);
             de.browars.command.LavaEscapeCommand.register(dispatcher);
+            de.browars.command.GameshowCommand.register(dispatcher);
         });
 
         // 10. Check for Updates via GitHub Releases

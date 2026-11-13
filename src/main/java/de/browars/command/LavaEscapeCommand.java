@@ -37,8 +37,6 @@ public class LavaEscapeCommand {
                         .executes(LavaEscapeCommand::executeSetGoal))
                 .then(Commands.literal("chests")
                         .executes(LavaEscapeCommand::executeSetChests))
-                .then(Commands.literal("chestarea")
-                        .executes(LavaEscapeCommand::executeSetChests))
                 .then(Commands.literal("team")
                         .then(Commands.literal("1")
                                 .then(Commands.argument("farbe", StringArgumentType.word())
@@ -172,8 +170,8 @@ public class LavaEscapeCommand {
         if (p1 != null && p2 != null && ArenaWandItem.isSelectionInCurrentDimension(player)) {
             arena.setChestAreaBounds(p1, p2);
             LavaEscapeSavedData.save(player.level());
-            min = arena.getChestAreaMin();
-            max = arena.getChestAreaMax();
+            min = arena.getEffectiveChestMin();
+            max = arena.getEffectiveChestMax();
         } else if (arena.hasArena()) {
             min = arena.getMinPos();
             max = arena.getMaxPos();

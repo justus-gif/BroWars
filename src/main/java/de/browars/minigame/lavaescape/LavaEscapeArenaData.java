@@ -169,12 +169,16 @@ public class LavaEscapeArenaData implements DuelArena {
     }
 
     public BlockPos getEffectiveChestMin() {
-        if (hasChestArea()) return chestAreaMin;
+        if (hasChestArea()) {
+            return chestAreaMin;
+        }
         return minPos;
     }
 
     public BlockPos getEffectiveChestMax() {
-        if (hasChestArea()) return chestAreaMax;
+        if (hasChestArea()) {
+            return chestAreaMax;
+        }
         return maxPos;
     }
 

@@ -48,6 +48,17 @@ public class ThrownEnderpearlMixin {
                     player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDER_PEARL_THROW, SoundSource.PLAYERS, 0.8f, 0.5f);
                 }
             }
+        } else if (active instanceof de.browars.minigame.lavaescape.LavaEscapeGame lavaEscape && lavaEscape.isRunning()) {
+            Vec3 loc = hitResult.getLocation();
+            var arena = lavaEscape.getArena();
+            if (arena != null && arena.hasArena() && !arena.isInsideArena(net.minecraft.core.BlockPos.containing(loc))) {
+                ci.cancel();
+                pearl.discard();
+                if (pearl.getOwner() instanceof ServerPlayer player) {
+                    player.sendSystemMessage(Component.literal("§c[Lava Escape] Du kannst dich nicht aus der Arena teleportieren!"), true);
+                    player.level().playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENDER_PEARL_THROW, SoundSource.PLAYERS, 0.8f, 0.5f);
+                }
+            }
         }
     }
 

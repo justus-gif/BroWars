@@ -18,6 +18,11 @@ public class WorldSpawnRespawnHandler {
                     manager.getActiveGame().onPlayerRespawn(newPlayer);
                     return;
                 }
+                var gameshow = de.browars.gameshow.GameshowManager.getInstance();
+                if (gameshow.isPlayerInShow(newPlayer.getUUID())) {
+                    gameshow.onPlayerRespawn(newPlayer);
+                    return;
+                }
                 teleportToWorldSpawn(newPlayer);
             }
         });
@@ -32,21 +37,41 @@ public class WorldSpawnRespawnHandler {
             overworld.getGameRules().set(GameRules.RESPAWN_RADIUS, 0, player.level().getServer());
         } catch (Exception ignored) {}
 
-        LevelData.RespawnData respawnData = overworld.getRespawnData();
-        BlockPos pos = respawnData.pos();
-        float yaw = respawnData.yaw();
-        float pitch = respawnData.pitch();
+        de.browars.gameshow.GameshowData.SpawnPoint mainSpawn =
+                de.browars.gameshow.GameshowSavedData.get(overworld).getData().getMainSpawn();
 
-        // Exact center of the world spawn block
-        player.teleportTo(
-                overworld,
-                pos.getX() + 0.5,
-                pos.getY(),
-                pos.getZ() + 0.5,
-                Set.of(),
-                yaw,
-                pitch,
-                true
-        );
+        player.stopRiding();
+        if (mainSpawn != null && mainSpawn.set()) {
+            ServerLevel targetLevel = player.level().getServer().getLevel(mainSpawn.dimension());
+            if (targetLevel == null) targetLevel = overworld;
+            player.teleportTo(
+                    targetLevel,
+                    mainSpawn.x(),
+                    mainSpawn.y(),
+                    mainSpawn.z(),
+                    Set.of(),
+                    mainSpawn.yaw(),
+                    mainSpawn.pitch(),
+                    true
+            );
+        } else {
+            LevelData.RespawnData respawnData = overworld.getRespawnData();
+            BlockPos pos = respawnData.pos();
+            float yaw = respawnData.yaw();
+            float pitch = respawnData.pitch();
+
+            player.teleportTo(
+                    overworld,
+                    pos.getX() + 0.5,
+                    pos.getY(),
+                    pos.getZ() + 0.5,
+                    Set.of(),
+                    yaw,
+                    pitch,
+                    true
+            );
+        }
+        player.setDeltaMovement(0, 0, 0);
+        player.fallDistance = 0;
     }
 }

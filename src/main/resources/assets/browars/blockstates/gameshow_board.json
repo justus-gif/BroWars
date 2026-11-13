@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "browars:block/gameshow_board"
+    }
+  }
+}

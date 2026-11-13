@@ -130,7 +130,7 @@ public final class ColorFloorGame extends AbstractDuelGame<ColorFloorArenaData> 
             if (isSoloMode) survivedCycles++;
             generateFloor();
             chooseTarget();
-            setCenterTitle("§a§lÜBERLEBT!", "Nächste Runde wird schneller...", 0xFF22C55E, 25);
+            setCenterTitle("§a§l✔", "", 0xFF22C55E, 18);
         }
     }
 

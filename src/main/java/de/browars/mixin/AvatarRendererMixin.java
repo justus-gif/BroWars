@@ -38,6 +38,10 @@ public class AvatarRendererMixin {
         cancellable = true
     )
     private void browars$crossWarNametagVisibility(Avatar avatar, double distanceToCameraSq, CallbackInfoReturnable<Boolean> cir) {
+        if (de.browars.client.gameshow.GameshowClientHolder.isInBlackRoomCutscene()) {
+            cir.setReturnValue(false);
+            return;
+        }
         if (de.browars.client.minigame.MinigameHudClientHolder.isActive()) {
             var state = de.browars.client.minigame.MinigameHudClientHolder.getState();
             if ("crosswar".equals(state.gameId())) {

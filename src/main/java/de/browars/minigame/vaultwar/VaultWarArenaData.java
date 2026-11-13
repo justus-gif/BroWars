@@ -172,10 +172,14 @@ public class VaultWarArenaData implements DuelArena {
     }
 
     public String validationError(ServerLevel level) {
+        return validationError(level, false);
+    }
+
+    public String validationError(ServerLevel level, boolean solo) {
         if (!hasArena) return "Arena wurde noch nicht festgelegt (/browars vaultwar arena).";
         if (spawn1 == null) return "Spawn 1 wurde noch nicht gesetzt (/browars vaultwar spawn 1).";
-        if (spawn2 == null) return "Spawn 2 wurde noch nicht gesetzt (/browars vaultwar spawn 2).";
-        if (!hasFence()) return "Trennzaun wurde noch nicht gesetzt (/browars vaultwar fence).";
+        if (!solo && spawn2 == null) return "Spawn 2 wurde noch nicht gesetzt (/browars vaultwar spawn 2).";
+        if (!solo && !hasFence()) return "Trennzaun wurde noch nicht gesetzt (/browars vaultwar fence).";
         if (!level.dimension().equals(dimension)) {
             return "Arena befindet sich in einer anderen Dimension (" + dimension.identifier() + ").";
         }

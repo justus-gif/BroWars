@@ -225,7 +225,7 @@ public class VaultWarCommand {
 
         ServerLevel level = first.level();
         VaultWarArenaData arena = VaultWarSavedData.get(level).getData();
-        String error = arena.validationError(level);
+        String error = arena.validationError(level, second == null);
         if (error != null) {
             source.sendFailure(Component.literal("§c[Vault War] " + error));
             return 0;

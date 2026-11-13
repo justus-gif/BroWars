@@ -58,9 +58,8 @@ public final class SpleefGame extends AbstractDuelGame<SpleefArenaData> {
 
     @Override public String getId() { return "spleef"; }
     @Override public String getDisplayName() { return "Spleef"; }
-    @Override protected String startInstruction() { return "Grabe deinem Gegner den Schnee unter den Füßen weg!"; }
+    @Override protected String startInstruction() { return ""; }
     @Override protected int targetScore() { return TARGET_SCORE; }
-    @Override protected String matchStatus() { return "Erster zu 7 • Best of 13"; }
 
     @Override
     protected int phaseNumber() {

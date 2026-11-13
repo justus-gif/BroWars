@@ -30,6 +30,7 @@ public class PlayerDamageMixin {
                 cir.setReturnValue(false);
                 return;
             }
+            victim.damageCooldownTime = 0;
             ((EntityAccessor) victim).setInvulnerableTime(0);
             return;
         }
@@ -39,6 +40,7 @@ public class PlayerDamageMixin {
             if (source.getEntity() instanceof net.minecraft.server.level.ServerPlayer attacker && victim instanceof net.minecraft.server.level.ServerPlayer serverVictim) {
                 tntTag.onPlayerAttack(attacker, serverVictim);
             }
+            victim.damageCooldownTime = 0;
             ((EntityAccessor) victim).setInvulnerableTime(0);
             cir.setReturnValue(false);
             return;
@@ -71,6 +73,12 @@ public class PlayerDamageMixin {
 
         if (active instanceof de.browars.minigame.AbstractDuelGame<?> game
                 && game.isRunning() && game.isPlayerParticipating(victim.getUUID())) {
+            cir.setReturnValue(false);
+            return;
+        }
+
+        if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInShow(victim.getUUID())
+                && de.browars.gameshow.GameshowManager.getInstance().getPhase() != de.browars.gameshow.GameshowManager.Phase.IN_GAME) {
             cir.setReturnValue(false);
             return;
         }
@@ -108,30 +116,37 @@ public class PlayerDamageMixin {
         if (active instanceof SumoGame sumo && sumo.isRunning() && sumo.isPlayerParticipating(victim.getUUID())) {
             // Keep victim at full health (no hearts loss in Sumo) and immediately ready for next hit
             victim.setHealth(victim.getMaxHealth());
+            victim.damageCooldownTime = 0;
             ((EntityAccessor) victim).setInvulnerableTime(0);
         }
     }
 
-    @Inject(method = "getAttackStrengthScale", at = @At("HEAD"), cancellable = true)
+    @Inject(method = {"getAttackStrengthScale", "getItemSwapScale"}, at = @At("HEAD"), cancellable = true)
     private void browars$alwaysFullAttackStrengthInSumo(float adjustTicks, CallbackInfoReturnable<Float> cir) {
         Player player = (Player) (Object) this;
-        Minigame active = MinigameManager.getInstance().getActiveGame();
-        if (active instanceof SumoGame sumo && sumo.isRunning() && sumo.isPlayerParticipating(player.getUUID())) {
-            // Permanent 100% attack cooldown recharge so spamming hits never suffers cooldown penalties!
+        if (de.browars.util.SumoHitboxHelper.isSumoActiveForPlayer(player)) {
+            // Permanent 100% attack cooldown recharge on both client and server so spamming hits never suffers cooldown penalties!
             cir.setReturnValue(1.0f);
+        }
+    }
+
+    @Inject(method = "getCurrentItemAttackStrengthDelay", at = @At("HEAD"), cancellable = true)
+    private void browars$zeroAttackDelayInSumo(CallbackInfoReturnable<Float> cir) {
+        Player player = (Player) (Object) this;
+        if (de.browars.util.SumoHitboxHelper.isSumoActiveForPlayer(player)) {
+            cir.setReturnValue(0.0f);
         }
     }
 
     /**
      * Attacking normally resets this ticker. Suppressing both reset variants makes
-     * Sumo's game stick genuinely cooldown-free on the server, including rapid
+     * Sumo's game stick genuinely cooldown-free on both client and server, including rapid
      * consecutive clicks.
      */
     @Inject(method = {"resetAttackStrengthTicker", "resetOnlyAttackStrengthTicker"}, at = @At("HEAD"), cancellable = true)
     private void browars$keepSumoAttackReady(CallbackInfo ci) {
         Player player = (Player) (Object) this;
-        Minigame active = MinigameManager.getInstance().getActiveGame();
-        if (active instanceof SumoGame sumo && sumo.isFightActive() && sumo.isPlayerParticipating(player.getUUID())) {
+        if (de.browars.util.SumoHitboxHelper.isSumoActiveForPlayer(player)) {
             ci.cancel();
         }
     }

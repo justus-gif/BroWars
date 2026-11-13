@@ -72,9 +72,19 @@ public class MinigameIntegrationTests {
             manager.startMinigame(() -> sumo);
             for (int i = 0; i < 100; i++) sumo.tick();
             helper.assertTrue(sumo.isFightActive(), "Common countdown starts Sumo after 100 ticks");
+            second.getAbilities().invulnerable = false;
             first.attack(second);
             helper.assertTrue(first.getAttackStrengthScale(0) == 1.0f,
                     "Sumo stick stays ready immediately after an attack");
+            helper.assertTrue(second.damageCooldownTime == 0,
+                    "Sumo victim has zero damageCooldownTime immediately after hit");
+            helper.assertTrue(((de.browars.mixin.EntityAccessor) second).getInvulnerableTime() == 0,
+                    "Sumo victim has zero invulnerableTime immediately after hit");
+            first.attack(second);
+            helper.assertTrue(first.getAttackStrengthScale(0) == 1.0f,
+                    "Sumo stick stays ready on consecutive hit");
+            helper.assertTrue(second.damageCooldownTime == 0,
+                    "Sumo victim maintains zero damageCooldownTime on consecutive hit");
             first.setPos(min.getX() + 1, min.getY() - 2, min.getZ() + 1);
             second.setPos(max.getX(), min.getY() - 2, max.getZ());
             sumo.tick();

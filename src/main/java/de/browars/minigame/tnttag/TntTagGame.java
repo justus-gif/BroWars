@@ -83,14 +83,14 @@ public class TntTagGame extends AbstractDuelGame<TntTagArenaData> {
                 rouletteStep++;
                 String candidate = (rouletteStep % 2 == 0) ? p1Name : p2Name;
                 int color = (rouletteStep % 2 == 0) ? p1Team.hexColor : p2Team.hexColor;
-                setCenterTitle(candidate, "Auslosung...", color, 8);
+                setCenterTitle(candidate, "", color, 8);
                 playSound(SoundEvents.UI_BUTTON_CLICK, 1.1f + (rouletteStep % 4) * 0.15f);
             }
             return true;
         } else if (phaseTicks == 10) {
             String lockedTagger = currentTagger == 1 ? p1Name : p2Name;
             int color = currentTagger == 1 ? p1Team.hexColor : p2Team.hexColor;
-            setCenterTitle(lockedTagger, "START-TAGGER", color, 25);
+            setCenterTitle(lockedTagger, "§cTNT", color, 25);
             playSound(SoundEvents.NOTE_BLOCK_PLING, 1.8f);
             playSound(SoundEvents.TNT_PRIMED, 1.0f);
             return true;
@@ -110,15 +110,12 @@ public class TntTagGame extends AbstractDuelGame<TntTagArenaData> {
 
         if (tagger != null) {
             equipTntHat(tagger);
-            // Starting tagger gets 3 seconds of Speed II
             tagger.addEffect(new MobEffectInstance(MobEffects.SPEED, 60, 1, false, false, true));
         }
         if (runner != null) {
             runner.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
         }
 
-        String taggerName = tagger != null ? tagger.getPlainTextName() : (currentTagger == 1 ? p1Name : p2Name);
-        message("§c§l" + taggerName + " §ehat das TNT erhalten! (3s Speed-Boost)");
         playSound(SoundEvents.TNT_PRIMED, 1.0f);
     }
 
@@ -127,7 +124,7 @@ public class TntTagGame extends AbstractDuelGame<TntTagArenaData> {
         boolean firstOut = (arena.hasArena() && !arena.containsPlayer(first)) || first.getY() < level.getMinY() + 1;
         boolean secondOut = second != null && ((arena.hasArena() && !arena.containsPlayer(second)) || second.getY() < level.getMinY() + 1);
         if (firstOut || secondOut) {
-            finishRound(firstOut, secondOut, "Aus der Arena gefallen!");
+            finishRound(firstOut, secondOut, "");
             return;
         }
 
@@ -141,7 +138,7 @@ public class TntTagGame extends AbstractDuelGame<TntTagArenaData> {
             if (explosionDelayTicks <= 0) {
                 boolean p1Lost = currentTagger == 1;
                 boolean p2Lost = currentTagger == 2;
-                finishRound(p1Lost, p2Lost, "TNT explodiert");
+                finishRound(p1Lost, p2Lost, "");
             }
             return;
         }
@@ -152,22 +149,18 @@ public class TntTagGame extends AbstractDuelGame<TntTagArenaData> {
         ServerPlayer runner = currentTagger == 1 ? second : first;
 
         if (tagger != null) {
-            // Keep TNT hat equipped
             ItemStack headItem = tagger.getItemBySlot(EquipmentSlot.HEAD);
             if (!headItem.is(Blocks.TNT.asItem())) {
                 equipTntHat(tagger);
             }
 
-            // Passive slight speed advantage (Speed I) for the tagger to catch up
             if (!tagger.hasEffect(MobEffects.SPEED)) {
                 tagger.addEffect(new MobEffectInstance(MobEffects.SPEED, 30, 0, false, false, false));
             }
 
-            // Spark and smoke particles above tagger's head
             level.sendParticles(ParticleTypes.SMOKE, tagger.getX(), tagger.getY() + 2.1, tagger.getZ(), 2, 0.1, 0.1, 0.1, 0.02);
             level.sendParticles(ParticleTypes.FLAME, tagger.getX(), tagger.getY() + 2.15, tagger.getZ(), 1, 0.05, 0.05, 0.05, 0.01);
 
-            // Audio cues: ticking accelerating near explosion
             if (explosionTicks <= 100) {
                 int interval = explosionTicks <= 40 ? 5 : 10;
                 if (explosionTicks % interval == 0) {
@@ -180,23 +173,20 @@ public class TntTagGame extends AbstractDuelGame<TntTagArenaData> {
             }
         }
 
-        // Check if explosion timer expired
         if (explosionTicks <= 0) {
             triggerExplosion(tagger);
         }
     }
 
     private void triggerExplosion(ServerPlayer tagger) {
-        explosionDelayTicks = 30; // 1.5s delay before respawn
+        explosionDelayTicks = 30;
         if (tagger != null) {
             level.explode(null, tagger.getX(), tagger.getY() + 0.5, tagger.getZ(), 0.0f, false, Level.ExplosionInteraction.NONE);
             level.sendParticles(ParticleTypes.EXPLOSION_EMITTER, tagger.getX(), tagger.getY() + 1.0, tagger.getZ(), 1, 0, 0, 0, 0);
             level.playSound(null, tagger.getX(), tagger.getY(), tagger.getZ(), SoundEvents.GENERIC_EXPLODE.value(), SoundSource.PLAYERS, 2.0f, 1.0f);
         }
 
-        String loserName = currentTagger == 1 ? p1Name : p2Name;
-        setCenterTitle("§c§lBOOM!", loserName + " ist explodiert!", 0xFFEF4444, 40);
-        message("§c§lBOOM! Das TNT von " + loserName + " ist explodiert!");
+        setCenterTitle("§c§lBOOM!", "", 0xFFEF4444, 35);
     }
 
     public void onPlayerAttack(ServerPlayer attacker, ServerPlayer victim) {

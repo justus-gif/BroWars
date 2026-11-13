@@ -117,6 +117,25 @@ public class BroWarsClientMod implements ClientModInitializer {
             });
         });
 
+        // Game Show HUD & Cutscene Sync Receiver
+        ClientPlayNetworking.registerGlobalReceiver(de.browars.network.SyncGameshowHudPayload.TYPE, (payload, context) -> {
+            context.client().execute(() -> {
+                de.browars.client.gameshow.GameshowClientHolder.setHudState(payload);
+            });
+        });
+
+        // Game Show Team Color Selection Screen Sync Receiver
+        ClientPlayNetworking.registerGlobalReceiver(de.browars.network.SyncGameshowColorSelectPayload.TYPE, (payload, context) -> {
+            context.client().execute(() -> {
+                de.browars.client.gameshow.GameshowClientHolder.setColorSelectState(payload);
+                if (payload.openOrKeepOpen()) {
+                    de.browars.client.gui.GameshowColorSelectScreen.openOrUpdate();
+                } else {
+                    de.browars.client.gui.GameshowColorSelectScreen.closeIfOpen();
+                }
+            });
+        });
+
         // Register Reload Keybind
         RELOAD_KEY = net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper.registerKeyMapping(new net.minecraft.client.KeyMapping(
                 "key.browars.reload",
@@ -130,6 +149,7 @@ public class BroWarsClientMod implements ClientModInitializer {
             de.browars.client.ClientColorFloorData.reset();
             de.browars.client.minigame.CrossWarClientHolder.reset();
             de.browars.client.minigame.PaintWarRouletteClientHolder.reset();
+            de.browars.client.gameshow.GameshowClientHolder.reset();
         });
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -145,6 +165,13 @@ public class BroWarsClientMod implements ClientModInitializer {
                 net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.TITLE_AND_SUBTITLE,
                 net.minecraft.resources.Identifier.fromNamespaceAndPath("browars", "minigame_hud"),
                 new de.browars.client.render.MinigameHudElement()
+        );
+
+        // Register Game Show HUD Element (Intro, Roulette, Evaluation, Finale, Lobby Scorebar)
+        net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry.attachElementAfter(
+                net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements.TITLE_AND_SUBTITLE,
+                net.minecraft.resources.Identifier.fromNamespaceAndPath("browars", "gameshow_hud"),
+                new de.browars.client.render.GameshowHudElement()
         );
 
         // Register Cross War Crosshair HUD Element
@@ -174,7 +201,9 @@ public class BroWarsClientMod implements ClientModInitializer {
             tintValues.add(color);
         }, de.browars.BroWarsMod.BOOST_PAD);
 
-        // Register Sky Block Renderer
+        // Register Sky Block Renderer & Client Batch Manager hooks
+        de.browars.block.entity.SkyBlockEntity.clientOnAdd = de.browars.client.render.SkyBlockClientManager::register;
+        de.browars.block.entity.SkyBlockEntity.clientOnRemove = de.browars.client.render.SkyBlockClientManager::unregister;
         net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry.register(
                 de.browars.BroWarsMod.SKY_BLOCK_ENTITY,
                 de.browars.client.render.SkyBlockRenderer::new
@@ -184,6 +213,7 @@ public class BroWarsClientMod implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             AreaSelectionRenderer.onClientTick(client);
             de.browars.client.minigame.PaintWarRouletteClientHolder.clientTick();
+            de.browars.client.gameshow.GameshowClientHolder.clientTick();
 
             if (client.player != null && client.player.getMainHandItem().is(de.browars.BroWarsMod.CROSSWAR_CROSSBOW)) {
                 boolean rDown = RELOAD_KEY != null && RELOAD_KEY.isDown();

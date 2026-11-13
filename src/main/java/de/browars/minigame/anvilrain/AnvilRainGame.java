@@ -50,9 +50,7 @@ public final class AnvilRainGame extends AbstractDuelGame<AnvilRainArenaData> {
     }
     @Override public String getId() { return "anvil_rain"; }
     @Override public String getDisplayName() { return "Anvil Rain"; }
-    @Override protected String startInstruction() { return "Weiche den Ambossen aus!"; }
-    @Override protected String matchStatus() { return "Erster zu 5 • " + phaseTitle() + " (" + anvils.size() + " Ambosse)"; }
-    @Override protected String soloStatus() { return "Solo • " + soloProgress() + " s (" + anvils.size() + " Ambosse)"; }
+    @Override protected String startInstruction() { return ""; }
 
     @Override
     protected int phaseNumber() {

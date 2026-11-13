@@ -1381,7 +1381,7 @@ public class PaintWarGame extends AbstractDuelGame<PaintWarArenaData> {
         if (second != null && second.getAttribute(Attributes.SNEAKING_SPEED) != null) {
             second.getAttribute(Attributes.SNEAKING_SPEED).setBaseValue(0.3);
         }
-        setCenterTitle("§e§lZEIT ABGELAUFEN!", "§fFarb-Fläche wird ausgewertet...", 0xFFFBBF24, REVEAL_DURATION_TICKS + 10);
+        setCenterTitle("§e§lAUSWERTUNG", "", 0xFFFBBF24, REVEAL_DURATION_TICKS + 10);
         playSound(SoundEvents.NOTE_BLOCK_PLING, 1.0f);
         MinigameManager.getInstance().broadcastHud(server, getHudState());
     }
@@ -1415,22 +1415,16 @@ public class PaintWarGame extends AbstractDuelGame<PaintWarArenaData> {
 
         double p1Pct = (p1Count * 100.0) / total;
         double p2Pct = (p2Count * 100.0) / total;
-        double whitePct = Math.max(0.0, 100.0 - p1Pct - p2Pct);
 
         if (isSoloMode) {
-            String summary = String.format(Locale.US, "%s%.1f%% §7(%d / %d Blöcke)", p1Team.chatPrefix, p1Pct, p1Count, total);
-            message("§6§lAuswertung: " + summary);
-            finishRound(true, false, "Erreichte Fläche: " + String.format(Locale.US, "%.1f%%", p1Pct));
-            setCenterTitle("§6§lERGEBNIS: " + String.format(Locale.US, "%.1f%%", p1Pct),
-                    "§f" + p1Count + " von " + total + " Blöcken gefärbt!", 0xFFFFD700, 90);
+            finishRound(true, false, String.format(Locale.US, "%.1f%%", p1Pct));
+            setCenterTitle("§6§l" + String.format(Locale.US, "%.1f%%", p1Pct),
+                    "§7" + p1Count + " / " + total, 0xFFFFD700, 90);
             return;
         }
 
-        String pctComparison = String.format(Locale.US, "%s%s: %.1f%% §8vs. %s%s: %.1f%%",
-                p1Team.chatPrefix, p1Name, p1Pct, p2Team.chatPrefix, p2Name, p2Pct);
-
-        message("§6§lAuswertung Runde " + score.round() + ": " + pctComparison
-                + String.format(Locale.US, " §8(Weiß: %.1f%%)", whitePct));
+        String pctComparison = String.format(Locale.US, "%s%.1f%% §8: %s%.1f%%",
+                p1Team.chatPrefix, p1Pct, p2Team.chatPrefix, p2Pct);
 
         boolean p1Lost;
         boolean p2Lost;
@@ -1445,20 +1439,19 @@ public class PaintWarGame extends AbstractDuelGame<PaintWarArenaData> {
             p2Lost = true;
         }
 
-        String reason = String.format(Locale.US, "%.1f%% zu %.1f%%", Math.max(p1Pct, p2Pct), Math.min(p1Pct, p2Pct));
+        String reason = String.format(Locale.US, "%.1f%% : %.1f%%", Math.max(p1Pct, p2Pct), Math.min(p1Pct, p2Pct));
         finishRound(p1Lost, p2Lost, reason);
 
-        // Override center subtitle with the percentage reveal only (no "Stand: X:Y")
         if (p1Count != p2Count) {
             String winner = p1Count > p2Count ? p1Name : p2Name;
             TeamColor winTeam = p1Count > p2Count ? p1Team : p2Team;
             String title = score.isFinished()
-                    ? "§6§l" + winner + " GEWINNT PAINT WAR!"
-                    : winTeam.chatPrefix + "§l" + winner + " GEWINNT DIE RUNDE!";
+                    ? winTeam.chatPrefix + "§l👑 " + winner
+                    : winTeam.chatPrefix + "§l" + winner;
             setCenterTitle(title, pctComparison,
                     score.isFinished() ? 0xFFFFD700 : winTeam.hexColor, score.isFinished() ? 110 : 70);
         } else {
-            setCenterTitle("§e§lGLEICHSTAND!", pctComparison, 0xFFFBBF24, 60);
+            setCenterTitle("§e§lGLEICHSTAND", pctComparison, 0xFFFBBF24, 60);
         }
     }
 

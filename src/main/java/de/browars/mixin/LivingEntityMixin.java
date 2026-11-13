@@ -59,8 +59,16 @@ public class LivingEntityMixin {
             }
 
             Minigame active = MinigameManager.getInstance().getActiveGame();
-            if (active instanceof AbstractDuelGame<?> duel && duel.isRoundActive() && duel.isPlayerParticipating(player.getUUID())) {
-                duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+            if (active instanceof AbstractDuelGame<?> duel && duel.isRunning() && duel.isPlayerParticipating(player.getUUID())) {
+                if (duel.isRoundActive()) {
+                    duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+                } else {
+                    duel.onPlayerRespawn(player);
+                }
+                return;
+            }
+            if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInShow(player.getUUID())) {
+                de.browars.gameshow.GameshowManager.getInstance().onPlayerRespawn(player);
                 return;
             }
 
@@ -90,8 +98,16 @@ public class LivingEntityMixin {
             }
 
             Minigame active = MinigameManager.getInstance().getActiveGame();
-            if (active instanceof AbstractDuelGame<?> duel && duel.isRoundActive() && duel.isPlayerParticipating(player.getUUID())) {
-                duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+            if (active instanceof AbstractDuelGame<?> duel && duel.isRunning() && duel.isPlayerParticipating(player.getUUID())) {
+                if (duel.isRoundActive()) {
+                    duel.finishRoundByElimination(player.getUUID(), "Besiegt!");
+                } else {
+                    duel.onPlayerRespawn(player);
+                }
+                return;
+            }
+            if (de.browars.gameshow.GameshowManager.getInstance().isPlayerInShow(player.getUUID())) {
+                de.browars.gameshow.GameshowManager.getInstance().onPlayerRespawn(player);
                 return;
             }
 

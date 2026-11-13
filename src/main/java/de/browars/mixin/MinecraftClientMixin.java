@@ -13,12 +13,28 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Minecraft.class)
 public class MinecraftClientMixin {
 
+    @org.spongepowered.asm.mixin.Shadow
+    protected int missTime;
+
     @Inject(method = "startAttack", at = @At("HEAD"), cancellable = true)
     private void browars$onStartAttack(CallbackInfoReturnable<Boolean> cir) {
         Minecraft mc = (Minecraft) (Object) this;
-        if (mc.player != null && mc.player.getMainHandItem().is(BroWarsMod.CROSSWAR_CROSSBOW)) {
-            ClientPlayNetworking.send(new CrossWarShootPayload());
-            cir.setReturnValue(false);
+        if (mc.player != null) {
+            if (de.browars.util.SumoHitboxHelper.isSumoActiveForPlayer(mc.player)) {
+                this.missTime = 0;
+            }
+            if (mc.player.getMainHandItem().is(BroWarsMod.CROSSWAR_CROSSBOW)) {
+                ClientPlayNetworking.send(new CrossWarShootPayload());
+                cir.setReturnValue(false);
+            }
+        }
+    }
+
+    @Inject(method = "startAttack", at = @At("RETURN"))
+    private void browars$afterStartAttack(CallbackInfoReturnable<Boolean> cir) {
+        Minecraft mc = (Minecraft) (Object) this;
+        if (mc.player != null && de.browars.util.SumoHitboxHelper.isSumoActiveForPlayer(mc.player)) {
+            this.missTime = 0;
         }
     }
 

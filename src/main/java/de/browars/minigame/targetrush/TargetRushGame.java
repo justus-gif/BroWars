@@ -90,26 +90,24 @@ public final class TargetRushGame extends AbstractDuelGame<TargetRushArenaData> 
         if (phase == Phase.FINISHED) {
             int s1 = points.getOrDefault(p1Uuid, 0);
             int s2 = p2Uuid == null ? 0 : points.getOrDefault(p2Uuid, 0);
-            if (s1 == s2) return "§eUnentschieden!";
-            String winner = s1 > s2 ? p1Name : p2Name;
-            return "§aSieger: §e" + winner;
+            return s1 + " : " + s2;
         }
-        if (inSuddenDeath) return "§c§lSUDDEN DEATH! §eNächster Treffer gewinnt!";
+        if (inSuddenDeath) return "§cSudden Death";
         int remSec = Math.max(0, (ROUND_DURATION_TICKS - playTicks + 19) / 20);
         int m = remSec / 60;
         int s = remSec % 60;
-        return String.format(Locale.ROOT, "%02d:%02d • %d Targets", m, s, activeTargets.size());
+        return String.format(Locale.ROOT, "%02d:%02d", m, s);
     }
 
     @Override
     protected String soloStatus() {
         if (phase == Phase.FINISHED) {
-            return "§aHighscore: §e" + points.getOrDefault(p1Uuid, 0) + " Pkt.";
+            return points.getOrDefault(p1Uuid, 0) + " Pkt.";
         }
         int remSec = Math.max(0, (ROUND_DURATION_TICKS - playTicks + 19) / 20);
         int m = remSec / 60;
         int s = remSec % 60;
-        return String.format(Locale.ROOT, "%02d:%02d • %d Targets", m, s, activeTargets.size());
+        return String.format(Locale.ROOT, "%02d:%02d", m, s);
     }
 
     @Override
@@ -176,13 +174,12 @@ public final class TargetRushGame extends AbstractDuelGame<TargetRushArenaData> 
                     inSuddenDeath = true;
                     playSound(SoundEvents.END_PORTAL_SPAWN, 1.2f);
                     playSound(SoundEvents.NOTE_BLOCK_BELL, 1.5f);
-                    setCenterTitle("§c§lSUDDEN DEATH!", "§eNächster Treffer entscheidet das Match!", 0xFFEF4444, 80);
-                    message("§c§lSUDDEN DEATH! §eGleichstand (" + s1 + " : " + s2 + ")! Der nächste Treffer gewinnt!");
+                    setCenterTitle("§c§lSUDDEN DEATH", "§7Nächster Treffer gewinnt", 0xFFEF4444, 70);
                 }
             } else if (s1 > s2) {
-                endDuelMatch(p1Uuid, p1Name, s1, s2, "Zeit abgelaufen!");
+                endDuelMatch(p1Uuid, p1Name, s1, s2, "");
             } else {
-                endDuelMatch(p2Uuid, p2Name, s2, s1, "Zeit abgelaufen!");
+                endDuelMatch(p2Uuid, p2Name, s2, s1, "");
             }
         }
     }
@@ -192,8 +189,7 @@ public final class TargetRushGame extends AbstractDuelGame<TargetRushArenaData> 
         phase = Phase.FINISHED;
         phaseTicks = 120; // 6 seconds end screen
 
-        setCenterTitle("§6§lZEIT ABGELAUFEN!", "§eHighscore: §a§l" + finalScore + " §ePunkte", 0xFFFFD700, 110);
-        message("§aZeit abgelaufen! Highscore von §e" + p1Name + "§a: §6§l" + finalScore + " Punkte§a!");
+        setCenterTitle("§6§l" + finalScore + " PUNKTE", "", 0xFFFFD700, 110);
 
         ServerPlayer p = server.getPlayerList().getPlayer(p1Uuid);
         if (p != null) {
@@ -208,9 +204,8 @@ public final class TargetRushGame extends AbstractDuelGame<TargetRushArenaData> 
         phase = Phase.FINISHED;
         phaseTicks = 140; // 7 seconds end screen
 
-        setCenterTitle("§6§l" + winnerName + " GEWINNT!", "§eEndstand: §a" + winScore + " §7zu §c" + loseScore + " §ePunkten", 0xFFFFD700, 120);
-        String reasonSuffix = (reason != null && !reason.isBlank()) ? " §8- §e" + reason : "";
-        message("§a" + winnerName + " gewinnt das Match! (§e" + winScore + " : " + loseScore + " Punkte§a)" + reasonSuffix);
+        TeamColor winTeam = p1Uuid.equals(winnerUuid) ? p1Team : p2Team;
+        setCenterTitle(winTeam.chatPrefix + "§l👑 " + winnerName, "§f" + winScore + " : " + loseScore, winTeam.hexColor, 120);
 
         ServerPlayer winnerPlayer = server.getPlayerList().getPlayer(winnerUuid);
         if (winnerPlayer != null) {

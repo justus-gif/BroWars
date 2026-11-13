@@ -124,7 +124,7 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
                     lastPhaseNumber = phaseNumber();
                     removeCountdownConcrete();
                     onRoundStarted();
-                    setCenterTitle("§a§lLOS!", startInstruction(), 0xFF22C55E, 30);
+                    setCenterTitle("§a§lLOS!", "", 0xFF22C55E, 24);
                     playSound(SoundEvents.NOTE_BLOCK_PLING, 2.0f);
                     for (UUID id : lastPlayers.keySet()) {
                         ServerPlayer p = server.getPlayerList().getPlayer(id);
@@ -134,7 +134,8 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
                     }
                 } else if (!onCountdownTick(phaseTicks) && phaseTicks % 20 == 0) {
                     int number = phaseTicks / 20;
-                    setCenterTitle(Integer.toString(number), "Bereit machen!", number > 2 ? 0xFFFBBF24 : 0xFFEF4444, 25);
+                    int countCol = number >= 4 ? 0xFFFFBB00 : (number >= 2 ? 0xFFF7770F : 0xFFD61811);
+                    setCenterTitle(Integer.toString(number), "", countCol, 25);
                     playSound(SoundEvents.NOTE_BLOCK_PLING, new float[]{0, 1.7f, 1.4f, 1.2f, 1.0f}[number]);
                 }
             }
@@ -151,7 +152,14 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
                 tickRound(first, second);
             }
             case INTERMISSION -> { if (phaseTicks <= 0) beginCountdown(); }
-            case FINISHED -> { if (phaseTicks <= 0) stop("Match regulär beendet"); }
+            case FINISHED -> {
+                if (phaseTicks <= 0) {
+                    UUID winner = getWinnerUuid();
+                    String summary = getResultSummary();
+                    stop("Match regulär beendet");
+                    de.browars.gameshow.GameshowManager.getInstance().onMinigameCompleted(this, winner, summary);
+                }
+            }
         }
     }
 
@@ -168,12 +176,12 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
     protected int timerRemaining() { return -1; }
     protected int timerTotal() { return -1; }
     protected int soloProgress() { return playTicks / 20; }
-    protected String soloStatus() { return "Solo • " + soloProgress() + " s"; }
+    protected String soloStatus() { return soloProgress() + "s"; }
     protected int targetScore() { return DuelScore.TARGET; }
     protected boolean shouldHealEveryTick() { return true; }
-    protected String matchStatus() { return "Erster zu " + score.target() + " Punkten"; }
+    protected String matchStatus() { return ""; }
     protected int phaseNumber() { return 1; }
-    protected String phaseTitle() { return "Aufwärmen"; }
+    protected String phaseTitle() { return ""; }
     protected int taggerIndex() { return 0; }
     protected boolean hasSpawnCampEjector() { return false; }
     protected boolean allowMultipleGameSlots() { return false; }
@@ -181,20 +189,7 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
     protected boolean shouldMaintainHunger() { return true; }
     protected GameType defaultGameType() { return GameType.ADVENTURE; }
     protected void onPhaseChanged(int oldPhase, int newPhase) {
-        String title = phaseTitle();
-        String color = switch (newPhase) {
-            case 2 -> "§6";
-            case 3 -> "§c";
-            default -> "§a";
-        };
-        message(color + "Phase " + newPhase + ": " + title + "!");
         playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, newPhase == 3 ? 1.5f : 1.2f);
-        for (UUID id : lastPlayers.keySet()) {
-            ServerPlayer player = server.getPlayerList().getPlayer(id);
-            if (player != null) {
-                player.sendSystemMessage(Component.literal(color + "§lPhase " + newPhase + ": " + title), true);
-            }
-        }
         MinigameManager.getInstance().broadcastHud(server, getHudState());
     }
 
@@ -205,16 +200,17 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
         clearRound();
         if (result == DuelScore.Result.SOLO_OUT) {
             phase = Phase.FINISHED;
-            phaseTicks = 80;
-            setCenterTitle("§c§lAUSGESCHIEDEN!", reason, 0xFFEF4444, 70);
+            phaseTicks = 70;
+            setCenterTitle("§c§lAUSGESCHIEDEN", "", 0xFFD61811, 65);
         } else if (result == DuelScore.Result.DRAW) {
             phase = Phase.INTERMISSION;
-            phaseTicks = 50;
-            setCenterTitle("§e§lGLEICHSTAND!", "Runde wird wiederholt", 0xFFFBBF24, 45);
-            message("§eBeide Spieler sind ausgeschieden. Runde wird wiederholt.");
+            phaseTicks = 45;
+            setCenterTitle("§e§lGLEICHSTAND", "", 0xFFFFBB00, 40);
         } else {
-            String winner = result == DuelScore.Result.PLAYER_ONE ? p1Name : p2Name;
-            UUID winnerUuid = result == DuelScore.Result.PLAYER_ONE ? p1Uuid : p2Uuid;
+            boolean p1Won = result == DuelScore.Result.PLAYER_ONE;
+            String winner = p1Won ? p1Name : p2Name;
+            TeamColor winTeam = p1Won ? p1Team : p2Team;
+            UUID winnerUuid = p1Won ? p1Uuid : p2Uuid;
             ServerPlayer winnerPlayer = server.getPlayerList().getPlayer(winnerUuid);
             if (winnerPlayer != null) {
                 level.sendParticles(ParticleTypes.HAPPY_VILLAGER, winnerPlayer.getX(), winnerPlayer.getY() + 1.2, winnerPlayer.getZ(), 15, 0.4, 0.4, 0.4, 0.1);
@@ -223,17 +219,16 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
                 }
             }
             MinigameSounds.playWin(server, score.isFinished(), p1Uuid, p2Uuid);
+            String scoreLine = "§f" + score.first() + " : " + score.second();
             if (score.isFinished()) {
                 phase = Phase.FINISHED;
-                phaseTicks = 120;
-                setCenterTitle("§6§l" + winner + " GEWINNT!", "Endstand: " + score.first() + " - " + score.second(), 0xFFFFD700, 110);
+                phaseTicks = 100;
+                setCenterTitle(winTeam.chatPrefix + "§l👑 " + winner, scoreLine, winTeam.hexColor, 95);
             } else {
                 phase = Phase.INTERMISSION;
-                phaseTicks = 50;
-                setCenterTitle("§a§lPUNKT FÜR " + winner + "!", "Spielstand: " + score.first() + " - " + score.second(), 0xFF22C55E, 45);
+                phaseTicks = 45;
+                setCenterTitle(winTeam.chatPrefix + "§l" + winner, scoreLine, winTeam.hexColor, 40);
             }
-            String reasonSuffix = (reason != null && !reason.isBlank()) ? " §8- §e" + reason : "";
-            message("§a" + winner + " gewinnt Runde " + score.round() + "! (" + score.first() + ":" + score.second() + ")" + reasonSuffix);
             if (!score.isFinished()) score.nextRound();
         }
         placeCountdownConcrete();
@@ -246,7 +241,7 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
         phase = Phase.COUNTDOWN;
         phaseTicks = 100;
         placeCountdownConcrete();
-        setCenterTitle("5", isSoloMode ? "Solo-Übungsmodus" : "Macht euch bereit!", 0xFF38BDF8, 25);
+        setCenterTitle("5", "", 0xFFFFBB00, 25);
         playSound(SoundEvents.NOTE_BLOCK_PLING, 0.8f);
     }
 
@@ -341,7 +336,13 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
             originals.clear();
             restoreTeamConcrete();
         } finally {
-            message("§7Minispiel beendet: " + reason);
+            if (reason != null && !reason.isBlank()
+                    && !reason.equals("Match regulär beendet")
+                    && !reason.equals("Neues Minispiel gestartet")
+                    && !reason.equals("test")
+                    && !reason.equals("test cleanup")) {
+                message("§7" + reason);
+            }
             MinigameManager.getInstance().broadcastHud(server, MinigameHudState.inactive());
         }
     }
@@ -542,6 +543,21 @@ public abstract class AbstractDuelGame<A extends DuelArena> implements Minigame 
 
     protected int p1Score() { return isSoloMode ? soloProgress() : score.first(); }
     protected int p2Score() { return score.second(); }
+
+    public final MinecraftServer getServer() { return server; }
+
+    public UUID getWinnerUuid() {
+        if (isSoloMode) return p1Uuid;
+        int s1 = p1Score();
+        int s2 = p2Score();
+        if (s1 > s2) return p1Uuid;
+        if (s2 > s1) return p2Uuid;
+        return p1Uuid;
+    }
+
+    public String getResultSummary() {
+        return p1Score() + ":" + p2Score();
+    }
 
     @Override public final MinigameHudState getHudState() {
         return new MinigameHudState(running, getId(), getDisplayName(), p1Name, p1Score(),

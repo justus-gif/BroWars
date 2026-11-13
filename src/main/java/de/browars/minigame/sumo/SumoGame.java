@@ -2,6 +2,7 @@ package de.browars.minigame.sumo;
 
 import de.browars.minigame.AbstractDuelGame;
 import de.browars.minigame.DuelScore;
+import de.browars.minigame.MinigameManager;
 import de.browars.minigame.MinigamePlayerState;
 import de.browars.minigame.TeamColor;
 import net.minecraft.core.component.DataComponents;
@@ -81,15 +82,14 @@ public final class SumoGame extends AbstractDuelGame<SumoArenaData> {
     protected String matchStatus() {
         double kb = getCurrentKnockback();
         if (kb > HIT_KNOCKBACK) {
-            return "Erster zu " + DuelScore.TARGET + " • KB +" + String.format(java.util.Locale.ROOT, "%.2f", kb - HIT_KNOCKBACK);
+            int pct = (int) Math.round((kb / HIT_KNOCKBACK - 1.0) * 100.0);
+            return "§6KB +" + pct + "%";
         }
-        return super.matchStatus();
+        return "";
     }
 
     public boolean registerHit(UUID attacker) {
         ServerPlayer player = server.getPlayerList().getPlayer(attacker);
-        // Do not impose an artificial per-tick hit limit. Minecraft still validates the
-        // interaction packet, range and line of sight before this is reached.
         return isFightActive() && player != null && getOpponent(player) != null;
     }
 
@@ -99,22 +99,12 @@ public final class SumoGame extends AbstractDuelGame<SumoArenaData> {
     }
 
     @Override protected void tickRound(ServerPlayer first, ServerPlayer second) {
-        if (finishRound(arena.isPlayerInLossZone(first), second != null && arena.isPlayerInLossZone(second), "Aus dem Ring gefallen!")) return;
+        if (finishRound(arena.isPlayerInLossZone(first), second != null && arena.isPlayerInLossZone(second), "")) return;
         double currentKb = getCurrentKnockback();
         if (currentKb > lastKnockback) {
             lastKnockback = currentKb;
-            int percentBoost = (int) Math.round((currentKb / HIT_KNOCKBACK - 1.0) * 100.0);
-            String text = "§6§lKnockback verstärkt: §e" + String.format(java.util.Locale.ROOT, "%.2f", currentKb) + " §c(+" + percentBoost + "%)";
-            for (UUID id : (isSoloMode ? java.util.List.of(p1Uuid) : java.util.List.of(p1Uuid, p2Uuid))) {
-                ServerPlayer p = server.getPlayerList().getPlayer(id);
-                if (p != null) {
-                    p.sendSystemMessage(Component.literal(text), true);
-                    p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket(Component.literal(text)));
-                    p.connection.send(new net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket(Component.literal(phaseNumber() == 3 ? "§c§lCHAOS-BOOST!" : "§6§lKNOCKBACK-UP!")));
-                }
-            }
             playSound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BELL, 1.4f);
-            playSound(net.minecraft.sounds.SoundEvents.ZOMBIE_VILLAGER_CONVERTED, 1.8f);
+            MinigameManager.getInstance().broadcastHud(server, getHudState());
         }
         if (playTicks % 20 == 0) removeDroppedEquipment();
     }

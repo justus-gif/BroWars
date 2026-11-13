@@ -53,8 +53,12 @@ public final class MinigameRegressionChecks {
         check(target.inflate(0.55).clip(new net.minecraft.world.phys.Vec3(0, 61.6, -3),
                 new net.minecraft.world.phys.Vec3(0, 61.6, 0)).isEmpty(), "out of range stays a miss");
 
-        // This standalone test has no datapack reload; bind the common defaults for the test stick.
-        net.minecraft.world.item.Items.STICK.builtInRegistryHolder().bindComponents(net.minecraft.core.component.DataComponents.COMMON_ITEM_COMPONENTS);
+        // This standalone test has no datapack reload; bind common defaults for all registered items.
+        net.minecraft.core.registries.BuiltInRegistries.ITEM.forEach(item -> {
+            try {
+                item.builtInRegistryHolder().bindComponents(net.minecraft.core.component.DataComponents.COMMON_ITEM_COMPONENTS);
+            } catch (Exception ignored) {}
+        });
         var plainStick = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.STICK);
         check(!de.browars.minigame.MinigamePlayerState.isGameItem(plainStick), "ordinary sticks are not game equipment");
         de.browars.minigame.MinigamePlayerState.markGameItem(plainStick);
@@ -253,6 +257,94 @@ public final class MinigameRegressionChecks {
         check(vaultLoaded.getSavedFenceBlocks().size() == 1, "vault war codec preserves saved fence blocks size");
         check(vaultLoaded.getSavedFenceBlocks().get(0).pos().equals(new BlockPos(20, 61, 10)), "vault war codec preserves saved fence block pos");
         check(vaultLoaded.getSavedFenceBlocks().get(0).state().is(net.minecraft.world.level.block.Blocks.OAK_FENCE), "vault war codec preserves saved fence block state");
+
+        var lavaArena = new de.browars.minigame.lavaescape.LavaEscapeArenaData();
+        check(!lavaArena.hasArena() && !lavaArena.isReady(), "fresh lava escape arena not ready");
+        lavaArena.setArenaBounds(new BlockPos(0, 60, 0), new BlockPos(16, 110, 16), Level.OVERWORLD);
+        lavaArena.setSpawn1(4, 61, 4, 0, 0, Level.OVERWORLD);
+        check(lavaArena.isReady() && !lavaArena.isReadyForDuel(), "lava escape ready for solo with spawn 1");
+        lavaArena.setSpawn2(12, 61, 12, 180, 0, Level.OVERWORLD);
+        lavaArena.setGoalBounds(new BlockPos(2, 108, 2), new BlockPos(14, 110, 14));
+        lavaArena.setChestAreaBounds(new BlockPos(1, 61, 1), new BlockPos(15, 105, 15));
+        check(lavaArena.isReadyForDuel() && lavaArena.hasGoal() && lavaArena.hasChestArea(), "lava escape fully configured");
+        check(lavaArena.isInsideGoal(new BlockPos(8, 109, 8)), "lava escape goal inside check");
+        check(!lavaArena.isInsideGoal(new BlockPos(8, 70, 8)), "lava escape goal outside check");
+        var lavaEncoded = de.browars.minigame.lavaescape.LavaEscapeArenaData.CODEC.encodeStart(JsonOps.INSTANCE, lavaArena).getOrThrow();
+        var lavaLoaded = de.browars.minigame.lavaescape.LavaEscapeArenaData.CODEC.parse(JsonOps.INSTANCE, lavaEncoded).getOrThrow();
+        check(lavaLoaded.isReadyForDuel() && lavaLoaded.hasGoal() && lavaLoaded.hasChestArea(), "lava escape codec roundtrip");
+        check(lavaLoaded.getGoalMin().equals(new BlockPos(2, 108, 2)), "lava escape codec preserves goal");
+        check(lavaLoaded.getChestAreaMax().equals(new BlockPos(15, 105, 15)), "lava escape codec preserves chest area");
+        check(lavaArena.getEffectiveChestMin().equals(new BlockPos(1, 61, 1)), "lava escape effective chest min preserves selected floor");
+        check(lavaArena.getEffectiveChestMax().equals(new BlockPos(15, 105, 15)), "lava escape effective chest max preserves selected bound");
+
+        // Verify Lava Escape chest loot generation
+        net.minecraft.util.RandomSource lootRandom = net.minecraft.util.RandomSource.create(42L);
+        net.minecraft.core.RegistryAccess regAccess = net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(net.minecraft.core.registries.BuiltInRegistries.REGISTRY);
+        for (int i = 0; i < 20; i++) {
+            var loot = de.browars.minigame.lavaescape.LavaEscapeLoot.generateChestLoot(regAccess, lootRandom);
+            check(!loot.isEmpty(), "lava escape loot is not empty");
+            int blockStacks = 0;
+            for (var item : loot) {
+                check(de.browars.minigame.MinigamePlayerState.isGameItem(item), "loot item is marked as game item");
+                if (item.getItem() instanceof net.minecraft.world.item.BlockItem) {
+                    blockStacks++;
+                }
+            }
+            check(blockStacks >= 1 && blockStacks <= 2, "lava escape chest has 1-2 block stacks (moderate blocks)");
+        }
+        check(lavaArena.getEffectiveChestMin().getY() == 61, "lava escape chest floor Y preserved");
+
+        // Verify Game Show Data (mainSpawn with Yaw/Pitch, Podium 1 & 2, Start/Lobby Area jump-safety, and Codec roundtrip)
+        var gsData = new de.browars.gameshow.GameshowData();
+        check(!gsData.getMainSpawn().set() && !gsData.getPodium1Pos().set() && !gsData.getPodium2Pos().set(), "fresh gameshow data unset");
+        gsData.setMainSpawn(12.5, 70.0, -8.5, -135.0f, 12.5f, Level.OVERWORLD);
+        gsData.setStartArea(new BlockPos(0, 64, 0), new BlockPos(4, 64, 4), Level.OVERWORLD);
+        gsData.setLobbyArea(new BlockPos(10, 64, 10), new BlockPos(14, 64, 14), Level.OVERWORLD);
+        gsData.setBlackRoomSpawn(100.5, 50.0, 100.5, 90.0f, 0.0f, Level.OVERWORLD);
+        gsData.setLobbySpawn(12.5, 65.0, 12.5, 180.0f, 0.0f, Level.OVERWORLD);
+        gsData.setPodium1Pos(50.5, 72.0, 50.5, 0.0f, 0.0f, Level.OVERWORLD);
+        gsData.setPodium2Pos(53.5, 71.0, 50.5, 15.0f, 0.0f, Level.OVERWORLD);
+        gsData.setPodiumViewerSpawn(52.0, 70.0, 44.0, 180.0f, -10.0f, Level.OVERWORLD);
+        gsData.addBoardBlock(new BlockPos(12, 66, 15));
+        gsData.setLastShow(new de.browars.gameshow.GameshowData.ShowRecord(
+                "Alpha", "red", 4, "Bravo", "blue", 3, 7, true, "Alpha",
+                List.of(new de.browars.gameshow.GameshowData.PlayedGameEntry(1, "sumo", "Sumo Ringen", "Alpha", "red", "5:3"))
+        ));
+
+        AABB startBox = gsData.getStartArea().toAABB();
+        check(startBox != null, "start area AABB non-null");
+        check(startBox.intersects(player(2.5, 65.0, 2.5)), "player standing on floor Y=65 intersects start area");
+        check(startBox.intersects(player(2.5, 66.6, 2.5)), "player jumping at Y=66.6 still intersects start area without resetting countdown");
+
+        var gsEncoded = de.browars.gameshow.GameshowData.CODEC.encodeStart(JsonOps.INSTANCE, gsData).getOrThrow();
+        var gsLoaded = de.browars.gameshow.GameshowData.CODEC.parse(JsonOps.INSTANCE, gsEncoded).getOrThrow();
+        check(gsLoaded.getMainSpawn().set()
+                && gsLoaded.getMainSpawn().yaw() == -135.0f
+                && gsLoaded.getMainSpawn().pitch() == 12.5f, "mainSpawn preserves exact rotation yaw and pitch");
+        check(gsLoaded.getPodium1Pos().set() && gsLoaded.getPodium1Pos().x() == 50.5 && gsLoaded.getPodium1Pos().y() == 72.0, "podium1Pos preserved");
+        check(gsLoaded.getPodium2Pos().set() && gsLoaded.getPodium2Pos().x() == 53.5 && gsLoaded.getPodium2Pos().y() == 71.0, "podium2Pos preserved");
+        check(gsLoaded.getLastShow().finished() && "Alpha".equals(gsLoaded.getLastShow().overallWinner()), "lastShow preserved");
+        check(gsLoaded.getLastShow().playedGames().size() == 1, "playedGames preserved");
+
+        for (var gType : de.browars.gameshow.GameshowGameType.values()) {
+            check(de.browars.gameshow.GameshowGameType.fromId(gType.id) == gType, "GameshowGameType lookup for " + gType.id);
+        }
+        check("§6● §6● §8○ §8○".equals(de.browars.client.render.BroWarsUiHelper.formatDots(2, 4, false)), "forward score dots");
+        check("§8○ §8○ §6● §6●".equals(de.browars.client.render.BroWarsUiHelper.formatDots(2, 4, true)), "reverse score dots");
+
+        // UI consistency checks (anthracite surfaces & gold/orange/red palette)
+        check(de.browars.client.render.BroWarsUiHelper.BG_PANEL == 0xF2141416, "neutral anthracite panel");
+        check(de.browars.client.render.BroWarsUiHelper.BG_CARD == 0xF21E1E22, "neutral anthracite card");
+        check(de.browars.client.render.BroWarsUiHelper.BG_ELEVATED == 0xF228282E, "neutral anthracite elevated");
+        check(de.browars.client.render.BroWarsUiHelper.BG_REEL == 0xF20E0E10, "neutral anthracite reel");
+        check(de.browars.client.render.BroWarsUiHelper.ACCENT_GOLD == 0xFFFFBB00, "signature gold accent");
+        check(de.browars.client.render.BroWarsUiHelper.ACCENT_ORANGE == 0xFFF7770F, "signature orange accent");
+        check(de.browars.client.render.BroWarsUiHelper.ACCENT_RED == 0xFFD61811, "signature red accent");
+
+        // TeamColor validation
+        check(de.browars.minigame.TeamColor.fromString("red", null) == de.browars.minigame.TeamColor.RED, "team color red");
+        check(de.browars.minigame.TeamColor.fromString("blue", null) == de.browars.minigame.TeamColor.BLUE, "team color blue");
+        check(de.browars.minigame.TeamColor.fromString("unknown_color", de.browars.minigame.TeamColor.YELLOW) == de.browars.minigame.TeamColor.YELLOW, "fallback team color");
 
         System.out.println("All " + checks + " minigame regression checks passed.");
     }
